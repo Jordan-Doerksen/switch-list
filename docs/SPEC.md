@@ -34,7 +34,7 @@ The tool should feel **tight, honest, and a little fun**, and every mechanic sho
 
 The prototype optimized for **joints** (couplings). **That is wrong as the primary score.** It produces wasteful lines — e.g. *kick two cars onto a standing cut, then pull them back and leave* — which is **zero joints but pure wasted movement**.
 
-**Primary metric = fewest MOVES.** A “move” is one engine trip / one called command (PULL, SPOT, or KICK). A conductor minimizes total work = total moves.
+**Primary metric = fewest MOVES — counted as engine direction‑moves (Jordan's call 2026‑06‑18).** A move is one engine run in one direction. So a **PULL = 2** (back in, pull out), a **SPOT = 2** (shove in, pull out), and a **KICK = 1** (shove and cut away — no pull‑out). Kicking therefore **saves a move**, not just a coupling — the real reason crews kick. The solver costs moves 2/2/1 and minimizes total engine‑moves (then joints). *(Deeper flat‑switching savings — double‑overs, running switches — aren't modelled in the simple lead+ladder; the one reversal‑saver here is the kick.)*
 
 - **Par = the minimum number of moves** to satisfy the job.
 - **Joints (couplings) are a secondary quality stat**, shown but not the target. Lower is better (kicking onto a tied cut saves a coupling), **but you never add a move just to save a joint.**

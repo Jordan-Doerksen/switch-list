@@ -124,7 +124,7 @@ export function pull(state, id, n) {
   state.engine.push(...taken);
   state.joints += 1;
   if (state.tracks[id].length < 2) state.secured[id] = false;
-  return commit(state, `Pulled ${n} from ${id}.`);
+  return commit(state, `Pulled ${n} from ${id}.`, 2);
 }
 
 export function spot(state, id, n) {
@@ -137,7 +137,7 @@ export function spot(state, id, n) {
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
   if (onto) state.joints += 1;
   if (state.tracks[id].length >= 2) state.secured[id] = true;
-  return commit(state, `Spotted ${n} to ${id}.`);
+  return commit(state, `Spotted ${n} to ${id}.`, 2);
 }
 
 // KICK n to T — shove and cut away; the cars coast onto a SECURED standing 2+ cut on
@@ -178,11 +178,13 @@ export function kick(state, id, n) {
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
   // no joint — the kicked cars coast on by themselves (that's the win vs spotting)
   state.secured[id] = true;                            // still a standing 2+ cut
-  return commit(state, `Kicked ${n} to ${id}.`);
+  return commit(state, `Kicked ${n} to ${id}.`, 1);
 }
 
 function refuse(state, msg) { state.msg = msg; return { ok: false, msg }; }
-function commit(state, msg) { state.moves += 1; state.msg = msg; return { ok: true, msg }; }
+// MOVES = engine direction-moves. A PULL or SPOT is back-in + pull-out = 2; a KICK is
+// shove-and-cut-away = 1 (no pull-out — that's the efficiency win for kicking).
+function commit(state, msg, cost = 1) { state.moves += cost; state.msg = msg; return { ok: true, msg }; }
 
 // --- Win + grade ----------------------------------------------------------
 const sameSet = (a, b) => { const x = a.slice().sort(), y = b.slice().sort(); return x.length === y.length && x.every((c, k) => c === y[k]); };

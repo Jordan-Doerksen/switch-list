@@ -32,7 +32,7 @@ export const PUZZLES = [
       AS76: [200, 'TILX 66108', 'TILX 66280'],
     },
     goal: { track: 'AS75', cars: ['CN 411002', 'CN 411040', 'GATX 88110', 'GATX 88128'] },
-    par: 3,
+    par: 6,
     opt: [['pull', 'AS73', 2], ['pull', 'AS72', 2], ['spot', 'AS75', 4]],
   },
   {
@@ -47,7 +47,7 @@ export const PUZZLES = [
       AS75: [220, ['CEFX 2019', 'autorack'], ['CEFX 2044', 'autorack']],
     },
     goal: { track: 'AS73', cars: ['CN 198450', 'CN 198212', 'CN 198330', 'BNSF 7244', 'CP 388190', 'UTLX 90113'] },
-    par: 3,
+    par: 6,
     opt: [['pull', 'AS71', 2], ['pull', 'AS72', 1], ['spot', 'AS73', 3]],
   },
   {
@@ -61,7 +61,7 @@ export const PUZZLES = [
       AS74: [220, ['TILX 4410', 'tank'], ['TILX 4428', 'tank']],
     },
     goal: { track: 'AS71', cars: ['CN 210044', 'CN 210052', 'CN 210066', 'GATX 55110', 'GATX 55308'] },
-    par: 3,
+    par: 6,
     opt: [['pull', 'AS72', 2], ['pull', 'AS76', 3], ['spot', 'AS71', 5]],
   },
   {
@@ -76,7 +76,7 @@ export const PUZZLES = [
       AS76: [200, ['ETTX 9001', 'autorack']],
     },
     goal: { track: 'AS74', cars: ['BNSF 8801', 'BNSF 8829', 'CP 77012', 'CP 77040', 'CN 41002'] },
-    par: 4,
+    par: 8,
     opt: [['pull', 'AS75', 1], ['pull', 'AS72', 2], ['pull', 'AS71', 2], ['spot', 'AS74', 5]],
   },
 
@@ -93,7 +93,7 @@ export const PUZZLES = [
       AS76: [200, ['CEFX 4410', 'autorack'], ['CEFX 4428', 'autorack']],
     },
     goal: { track: 'AS75', cars: ['CN 720019', 'CN 720037', 'CN 720055'] },
-    par: 4,
+    par: 8,
     opt: [['pull', 'AS71', 4], ['pull', 'AS73', 1], ['spot', 'AS75', 3], ['spot', 'AS71', 2]],
   },
   {
@@ -107,7 +107,7 @@ export const PUZZLES = [
       AS76: [200, ['UTLX 8810', 'tank'], ['UTLX 8828', 'tank']],
     },
     goal: { track: 'AS74', cars: ['CN 305001', 'CN 305002', 'CN 305003', 'CN 305004'], ordered: true },
-    par: 8,
+    par: 16,
     opt: [['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1]],
   },
   {
@@ -122,7 +122,7 @@ export const PUZZLES = [
       AS71: [200, ['UTLX 7120', 'tank'], ['UTLX 7148', 'tank']],
     },
     goal: { track: 'AS74', cars: ['CN 480012', 'CN 480044', 'CN 480066'] },
-    par: 5,
+    par: 10,
     opt: [['pull', 'AS74', 3], ['pull', 'AS73', 1], ['pull', 'AS72', 2], ['spot', 'AS74', 3], ['spot', 'AS76', 3]],
   },
   {
@@ -137,7 +137,7 @@ export const PUZZLES = [
       AS76: [200, ['CEFX 9001', 'autorack']],
     },
     goal: { track: 'AS75', cars: ['CN 501001', 'CN 501002', 'CN 501003'] },
-    par: 5,
+    par: 10,
     opt: [['pull', 'AS72', 2], ['pull', 'AS71', 1], ['pull', 'AS73', 1], ['spot', 'AS75', 3], ['spot', 'AS72', 1]],
   },
 
@@ -159,7 +159,7 @@ export const PUZZLES = [
       AS76: [180, ['CN 318404', 'autorack'], ['DTTX 5012', 'autorack']],
     },
     goal: { track: 'AS73', cars: ['CN 318044', 'BNSF 5521'] },
-    par: 3,
+    par: 6,
     opt: [['pull', 'AS71', 1], ['pull', 'AS74', 1], ['spot', 'AS73', 2]],
   },
   {
@@ -176,7 +176,7 @@ export const PUZZLES = [
       AS76: [180, ['CN 33120', 'hopper'], ['CN 33148', 'hopper']],
     },
     goal: { track: 'AS73', cars: ['CN 445010', 'CN 445028', 'CN 661012', 'CN 661140'] },
-    par: 2,
+    par: 3,
     opt: [['pull', 'AS71', 2], ['kick', 'AS73', 2]],
   },
   {
@@ -193,7 +193,7 @@ export const PUZZLES = [
       AS76: [200, ['UTLX 3300', 'tank']],
     },
     goal: { track: 'AS73', cars: ['CN 70010', 'CN 70028', 'CN 81002', 'CN 81044'] },
-    par: 2,
+    par: 3,
     opt: [['pull', 'AS71', 2], ['kick', 'AS73', 2]],
   },
   {
@@ -210,7 +210,7 @@ export const PUZZLES = [
       AS76: [180, ['ETTX 7001', 'autorack']],
     },
     goal: { cars: ['CN 401001', 'CN 401002', 'CN 401003'], ordered: true, depart: true },
-    par: 2,
+    par: 4,
     opt: [['pull', 'AS72', 1], ['pull', 'AS73', 2]],
   },
 ];

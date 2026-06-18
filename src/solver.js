@@ -32,7 +32,7 @@ class Heap {
 //   • SPOT to the goal track always; to any other track only while the engine holds a
 //     non-goal car (i.e. you're stashing a blocker). Pure gathers stay tiny; clearing
 //     puzzles open up just enough. (Distractor-only tracks are never pulled.)
-export function solve(puzzle, { maxMoves = 14, maxStates = 150000 } = {}) {
+export function solve(puzzle, { maxMoves = 28, maxStates = 150000 } = {}) {
   const goalTrack = puzzle.goal.track;
   const goalCars = new Set(puzzle.goal.cars);
   const depart = !!puzzle.goal.depart;          // DEPART: the consist rides on the engine, not a track
