@@ -9,37 +9,43 @@
 import { TRACK_IDS, NTRACK, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType } from './geometry.js';
 
 export const lenOf = (state, label) => carLen(state.type[label]);
+export const loadedOf = (state, label) => state.loaded[label] !== false;   // default loaded
 
 // puzzle.start[id] is a layout list: a number = a gap in px (a leading number =
 // how far off the switch the first car sits); a string = a box car by that mark;
 // an [mark, type] pair = a car of that type. e.g.
 //   AS72: [200, 'CN 41', ['GATX 90','tank'], ['TTGX 5','autorack']]
 function layout(entries) {
-  const cars = [], pos = [], types = {};
+  const cars = [], pos = [], types = {}, loads = {};
   let cursor = null;
   for (const e of entries) {
     if (typeof e === 'number') { cursor = cursor == null ? e : cursor + e; continue; }
     const mark = Array.isArray(e) ? e[0] : e;
     const type = Array.isArray(e) ? (e[1] || 'box') : 'box';
+    const empty = Array.isArray(e) && (e[2] === 'E' || e[2] === 'empty');   // 3rd entry 'E' = empty
     if (cursor == null) cursor = SPOT_CLEAR;
-    cars.push(mark); pos.push(cursor); types[mark] = type;
+    cars.push(mark); pos.push(cursor); types[mark] = type; loads[mark] = !empty;
     cursor += carLen(type);
   }
-  return { cars, pos, types };
+  return { cars, pos, types, loads };
 }
 
 export function freshState(puzzle) {
-  const tracks = {}, pos = {}, secured = {}, lined = {}, type = {};
+  const tracks = {}, pos = {}, secured = {}, lined = {}, type = {}, loaded = {};
   for (let i = 0; i < NTRACK; i++) {
     const id = TRACK_IDS[i];
     const L = layout((puzzle.start && puzzle.start[id]) || []);
-    tracks[id] = L.cars; pos[id] = L.pos; Object.assign(type, L.types);
+    tracks[id] = L.cars; pos[id] = L.pos; Object.assign(type, L.types); Object.assign(loaded, L.loads);
     secured[id] = (puzzle.startSecured && puzzle.startSecured[id]) || tracks[id].length >= 2;
     lined[id] = 'normal';
   }
-  // kickable tracks are a SPECIAL INSTRUCTION, declared per puzzle (may be none).
+  // kickable tracks are a SPECIAL INSTRUCTION, per puzzle (may be none). The kick
+  // count limit is also an S.I. — per puzzle, but the ceiling is always 5 total / 3
+  // loaded (a puzzle may be stricter, never looser; Jordan's call).
   const kickable = puzzle.kickable ? puzzle.kickable.slice() : [];
-  return { tracks, pos, type, engine: [], secured, lined, kickable, moves: 0, joints: 0, msg: '', won: false };
+  const kl = puzzle.kickLimit || {};
+  const kickLimit = { total: Math.min(5, kl.total ?? 5), loaded: Math.min(3, kl.loaded ?? 3) };
+  return { tracks, pos, type, loaded, engine: [], secured, lined, kickable, kickLimit, moves: 0, joints: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -147,9 +153,16 @@ export function canKick(state, id, n) {
     return { ok: false, msg: `${id} isn't a kickable track here — kicking is only allowed where the special instruction says (CROR 113.4).` };
   if (state.tracks[id].length < 2 || !state.secured[id])
     return { ok: false, msg: `You can only kick onto a secured standing cut of 2+ cars — ${id} isn't tied down (CROR 113.4/113.5).` };
-  const bad = state.engine.slice(state.engine.length - n).find((c) => !kickableType(state.type[c]));
+  const kicked = state.engine.slice(state.engine.length - n);
+  const bad = kicked.find((c) => !kickableType(state.type[c]));
   if (bad)
     return { ok: false, msg: `${bad} can't be kicked — that car type isn't kicked here (CROR 113.4 + special instruction).` };
+  if (n > state.kickLimit.total)
+    return { ok: false, msg: `Too many to kick at once — the limit here is ${state.kickLimit.total} (special instruction, CROR 113.5(a)(v)).` };
+  if (kicked.filter((c) => loadedOf(state, c)).length > state.kickLimit.loaded)
+    return { ok: false, msg: `Too many LOADED cars in one kick — at most ${state.kickLimit.loaded} loaded (special instruction).` };
+  if (!loadedOf(state, state.tracks[id][0]) && kicked.some((c) => loadedOf(state, c)))
+    return { ok: false, msg: `Don't kick a loaded car onto an empty cut — ${id}'s standing car is empty (special instruction).` };
   const plan = spotPlan(state, id, n);
   if (switchPos(TRACK_IDS.indexOf(id)).x + plan.deepEdge > TRACK_RIGHT)
     return { ok: false, msg: `${id} is too full to take ${n} more.` };

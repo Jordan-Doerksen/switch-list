@@ -15,6 +15,7 @@ export const RULES = {
   secure: { kind: 'cror', cite: 'CROR 112',           label: 'A standing cut of 2+ cars is tied down (secured)' },
   kick:   { kind: 'cror', cite: 'CROR 113.4 / 113.5', label: 'Kick only onto a secured cut; not every car can be kicked' },
   kickable: { kind: 'si', cite: 'Kickable tracks',    label: 'Kick only where the special instruction allows (⚡)' },
+  loads:    { kind: 'si', cite: 'Loads & empties',     label: 'Solid = loaded, hollow = empty. Don’t kick a load into empties; kick ≤5 (≤3 loaded)' },
 };
 
 export const PUZZLES = [
@@ -124,6 +125,23 @@ export const PUZZLES = [
       AS76: [180, ['CN 33120', 'hopper'], ['CN 33148', 'hopper']],
     },
     goal: { track: 'AS73', cars: ['CN 445010', 'CN 445028', 'CN 661012', 'CN 661140'] },
+    par: 2,
+    opt: [['pull', 'AS71', 2], ['kick', 'AS73', 2]],
+  },
+  {
+    id: 'p4-loads', tier: 4,
+    title: 'Loads & empties',
+    hint: 'Solid cars are loaded, hollow are empty. AS73 holds a tied-down cut of EMPTIES (kickable ⚡). Bring the two empty box cars off AS71 and KICK them on. The loaded cars around the yard can’t be kicked into those empties — and you never kick more than 5 (max 3 loaded).',
+    rules: ['loads', 'kickable', 'secure', 'kick', 'line', 'speed', 'couple', 'shove'],
+    kickable: ['AS73'],
+    start: {
+      AS73: [200, ['CN 70010', 'hopper', 'E'], ['CN 70028', 'hopper', 'E']],   // secured EMPTY cut
+      AS71: [140, ['CN 81002', 'box', 'E'], ['CN 81044', 'box', 'E']],         // your two empties
+      AS72: [240, 'CN 55120', 'CN 55148'],                                     // loaded box (solid)
+      AS75: [220, ['ETTX 9001', 'autorack']],                                  // loaded autorack
+      AS76: [200, ['UTLX 3300', 'tank']],                                      // loaded tank
+    },
+    goal: { track: 'AS73', cars: ['CN 70010', 'CN 70028', 'CN 81002', 'CN 81044'] },
     par: 2,
     opt: [['pull', 'AS71', 2], ['kick', 'AS73', 2]],
   },

@@ -107,7 +107,7 @@ function drawTrackLabels(ctx, state, showSecured) {
   }
 }
 
-function carRect(ctx, x, y, angle, len, label, kind, type) {
+function carRect(ctx, x, y, angle, len, label, kind, type, loaded) {
   ctx.save();
   ctx.translate(x, y); ctx.rotate(angle);
   const h = 20;
@@ -117,17 +117,18 @@ function carRect(ctx, x, y, angle, len, label, kind, type) {
     ctx.fillStyle = C.head;                                  // headlight
     ctx.beginPath(); ctx.arc(-len / 2 + 5, 0, 2.6, 0, Math.PI * 2); ctx.fill();
   } else {
-    const ty = TYPES[type] || TYPES.box;
-    ctx.fillStyle = ty.fill; ctx.strokeStyle = ty.edge; ctx.lineWidth = 1.5;
+    const ty = TYPES[type] || TYPES.box, empty = loaded === false;
+    // loaded = solid/filled body; empty = hollow/dark with a type-coloured outline
+    ctx.fillStyle = empty ? '#10141a' : ty.fill; ctx.strokeStyle = empty ? ty.fill : ty.edge; ctx.lineWidth = 1.5;
     roundRect(ctx, -len / 2, -h / 2, len, h, 3); ctx.fill(); ctx.stroke();
     if (label) {
       const disp = label.split(' ').pop();   // the car number — how it's actually called
-      ctx.fillStyle = C.carText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = empty ? ty.fill : C.carText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       let fs = 9; ctx.font = `700 ${fs}px ui-monospace, monospace`;
       while (ctx.measureText(disp).width > len - 8 && fs > 6) { fs -= 0.5; ctx.font = `700 ${fs}px ui-monospace, monospace`; }
       ctx.fillText(disp, 0, 0.5);
       // tiny type tag at the throat end (helps tell sizes/types apart)
-      ctx.fillStyle = 'rgba(20,24,30,0.55)'; ctx.font = '700 6.5px ui-monospace, monospace';
+      ctx.fillStyle = empty ? 'rgba(255,255,255,0.3)' : 'rgba(20,24,30,0.55)'; ctx.font = '700 6.5px ui-monospace, monospace';
       ctx.textAlign = 'left'; ctx.fillText(ty.tag, -len / 2 + 3, -h / 2 + 5);
     }
   }
@@ -149,7 +150,7 @@ function drawStandingCars(ctx, state, i, shove) {
   for (let k = 0; k < cars.length; k++) {
     const nearEdge = shoving ? shove.from[k] + (shove.to[k] - shove.from[k]) * shove.prog : P[k];
     const w = carLen(state.type[cars[k]]);
-    carRect(ctx, sx + nearEdge + w / 2, y, 0, w, cars[k], 'car', state.type[cars[k]]);
+    carRect(ctx, sx + nearEdge + w / 2, y, 0, w, cars[k], 'car', state.type[cars[k]], state.loaded[cars[k]]);
   }
 }
 
@@ -162,7 +163,7 @@ function drawTrain(ctx, route, engS, cut, state) {
   for (const label of cut) {
     const w = carLen(state.type[label]);
     const p = polyAt(route, s + w / 2);
-    carRect(ctx, p.x, p.y, p.angle, w, label, 'car', state.type[label]);
+    carRect(ctx, p.x, p.y, p.angle, w, label, 'car', state.type[label], state.loaded[label]);
     s += w;
   }
 }
