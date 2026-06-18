@@ -2,7 +2,7 @@
 // builder (PULL/SPOT/count/track), the two counters, rule chips, win + reset.
 // Command-and-watch: you line the road and call the move; the engine works it.
 
-import { W, H, NTRACK, TRACK_IDS, switchPos, engineRoute, CARLEN, ENGLEN, SPOT_CLEAR, restS } from './geometry.js';
+import { W, H, NTRACK, TRACK_IDS, switchPos, engineRoute, ENGLEN, restS, carLen } from './geometry.js';
 import { freshState, lineSwitch, canPull, canSpot, spotPlan, pull, spot, checkWin, grade } from './model.js';
 import { render } from './render.js';
 import { play, setSpeed } from './anim.js';
@@ -15,12 +15,15 @@ const dpr = Math.min(2, window.devicePixelRatio || 1);
 canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
 
 let puzzle, state, anim = null, busy = false, watching = false;
+let ordered = true;                 // is the switch list verified? (true when there's no list to check)
+const flagged = new Set();          // indices the player has flagged as wrong
 
 const $ = (id) => document.getElementById(id);
 
 function load(p) {
   puzzle = p; state = freshState(p); anim = null; busy = false; watching = false; setSpeed(1);
-  renderRules(); renderWorkOrder(); syncBuilder(); paint(); banner('', '');
+  ordered = !p.listed; flagged.clear();
+  renderRules(); renderOrder(); syncBuilder(); paint(); banner('', '');
   $('readout').textContent = `Moves 0 / par ${p.par} · Joints 0`;
 }
 
@@ -61,7 +64,7 @@ function animateMove(kind, id, n) {
     const i = TRACK_IDS.indexOf(id);
     const route = engineRoute(i);
     const sw = sSwitch(i);
-    const heldLen = state.engine.length * CARLEN;
+    const heldLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
     // where the cut's deepest car comes to rest on the track — the loco stops here,
     // never driving past it into standing cars.
     let coupleFar, shoveBase = null;
@@ -69,7 +72,8 @@ function animateMove(kind, id, n) {
       coupleFar = sw + state.pos[id][0];                       // the throat car's near edge
     } else {
       const plan = spotPlan(state, id, n);
-      coupleFar = sw + plan.yourPos[plan.yourPos.length - 1] + CARLEN;
+      const deepCar = state.engine[state.engine.length - 1];   // deepest spotted car
+      coupleFar = sw + plan.yourPos[plan.yourPos.length - 1] + carLen(state.type[deepCar]);
       if (plan.shove) shoveBase = { id, from: state.pos[id].slice(), to: plan.newStanding, oldThroat: state.pos[id][0] };
     }
     const engIn = coupleFar - ENGLEN / 2 - heldLen;
@@ -110,6 +114,7 @@ function animateMove(kind, id, n) {
 
 function doMove(kind, id, n) {
   if (busy) return;
+  if (!ordered) { sfx.refuse(); banner('Verify the switch list first — flag the bad lines and certify the order.', 'bad'); return; }
   const chk = precheck(kind, id, n);
   if (!chk.ok) { sfx.refuse(); banner(chk.msg, 'bad'); return; }
   busy = true;
@@ -124,6 +129,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function watchOptimal() {
   if (busy || !puzzle.opt) return;
   load(puzzle);
+  if (!ordered) {                                   // auto-certify the list for the demo
+    puzzle.listed.forEach((e, i) => { if (e.error) flagged.add(i); });
+    ordered = true; renderOrder();
+  }
   busy = true; watching = true; setSpeed(1.7);
   banner(`▶ Watching the optimal line — par ${puzzle.par} move${puzzle.par === 1 ? '' : 's'}`, 'ok');
   for (const [act, trk, n] of puzzle.opt) {
@@ -173,6 +182,66 @@ function renderRules() {
     chip.innerHTML = `<b>${r.cite}</b><span>${r.label}</span>`;
     box.appendChild(chip);
   }
+}
+
+// Route the work-order panel: a normal order, the interactive switch-list check
+// (#7), or the verified/corrected order once certified.
+function renderOrder() {
+  if (!puzzle.listed) { renderWorkOrder(); return; }
+  if (ordered) { renderVerifiedOrder(); return; }
+
+  const rows = puzzle.listed.map((e, i) =>
+    `<div class="ord-row${flagged.has(i) ? ' flagged' : ''}" data-i="${i}">`
+    + `<span class="ord-flag">${flagged.has(i) ? '⚑' : '▢'}</span>`
+    + `<span class="ord-mark">${e.listedMark}</span><span class="ord-arrow">→</span><span class="ord-trk">${e.listedTrack}</span>`
+    + `</div>`).join('');
+  $('workorder').innerHTML =
+    `<div class="wo-top"><span class="wo-tag si">SWITCH LIST</span> <span class="wo-id">${puzzle.id.toUpperCase()}</span> · the list can be wrong</div>`
+    + `<div class="wo-job">Build <b>${puzzle.goal.track}</b> from these cars. Check each line against the yard — tap any that <b>don't match</b>, then certify.</div>`
+    + `<div class="ord-list">${rows}</div>`
+    + `<button class="go" id="certify">Certify order ▸</button>`
+    + `<div class="wo-meta"><span class="wo-tip">${puzzle.hint}</span></div>`;
+  $('workorder').querySelectorAll('.ord-row').forEach((row) => row.addEventListener('click', () => {
+    const i = +row.dataset.i; flagged.has(i) ? flagged.delete(i) : flagged.add(i); sfx.points(); renderOrder();
+  }));
+  $('certify').addEventListener('click', certify);
+}
+
+function certify() {
+  resume();
+  const errs = new Set(puzzle.listed.map((e, i) => (e.error ? i : -1)).filter((i) => i >= 0));
+  const ok = flagged.size === errs.size && [...flagged].every((i) => errs.has(i));
+  if (ok) {
+    ordered = true; sfx.couple();
+    renderOrder(); syncBuilder();
+    banner(`✓ Order verified — now work the real cars onto ${puzzle.goal.track}.`, 'win');
+    return;
+  }
+  sfx.refuse();
+  const missed = [...errs].find((i) => !flagged.has(i));
+  const over = [...flagged].find((i) => !errs.has(i));
+  let why;
+  if (missed != null) {
+    const e = puzzle.listed[missed];
+    why = e.error === 'location'
+      ? `${e.listedTrack} has no ${e.listedMark} — that car isn't where the list says.`
+      : `read ${e.listedTrack} again — the number on the ground isn't ${e.listedMark}.`;
+  } else {
+    const e = puzzle.listed[over];
+    why = `${e.listedMark} on ${e.listedTrack} checks out — don't flag a good line.`;
+  }
+  banner(`Not so fast — ${why}`, 'bad');
+}
+
+function renderVerifiedOrder() {
+  const g = puzzle.goal;
+  const lines = puzzle.listed
+    .map((e) => `<b>${e.trueMark}</b> → ${e.trueTrack}${e.error ? ' <span class="ord-fix">(list was wrong)</span>' : ''}`)
+    .join(' · ');
+  $('workorder').innerHTML =
+    `<div class="wo-top"><span class="wo-tag">WORK ORDER ✓</span> <span class="wo-id">${g.track}</span> · verified</div>`
+    + `<div class="wo-job">Build <b>${g.track}</b>: ${lines}.</div>`
+    + `<div class="wo-meta">Target <b>${puzzle.par} move${puzzle.par === 1 ? '' : 's'}</b> (par) — fewest moves wins.</div>`;
 }
 
 // The job, stated like a switch list — derived from the puzzle goal.

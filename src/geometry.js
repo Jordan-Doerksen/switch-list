@@ -27,18 +27,28 @@ export const TRACK_RIGHT = 1292;         // deep end of every body track
 const beyond = switchPos(NTRACK - 1);
 export const MAIN_OUT = { x: beyond.x + STEP_X * 3, y: beyond.y - STEP_Y * 3 };
 
-// --- Sizes (px). Standard car ≈ 50 ft ≈ 42 px (~0.84 px/ft, SPEC §3).
-export const CARLEN = 42;
+// --- Sizes (px). ~0.84 px/ft (SPEC §3/§4). Different car TYPES have real, different
+// lengths — that's the point of types: a yard of mixed sizes works differently.
+export const CARLEN = 42;                // legacy default = a 50 ft box car
 export const ENGLEN = 64;
 export const CLEAR = 30;                 // clearance / foul point: this far out from a switch
 export const TRACK_HEAD = 44;            // default gap switch → throat car (CLEARS the foul point)
 export const SPOT_CLEAR = 44;            // where a fresh spot lands on an empty track (≥ CLEAR)
 export const LEAD_REST = 120;            // engine's resting x on the lead (empty)
-export const LEAD_CAP = 12;              // max cars the lead holds clear of the ladder (CROR 114)
+
+export const TYPES = {
+  box:        { len: 42, fill: '#aeb6c0', edge: '#5b636e', tag: 'BX' },   // ~50 ft
+  hopper:     { len: 47, fill: '#9fb6a2', edge: '#5a6b5d', tag: 'HP' },   // ~56 ft covered hopper
+  tank:       { len: 50, fill: '#b3a7c4', edge: '#665d77', tag: 'TK' },   // ~60 ft tank car
+  centerbeam: { len: 61, fill: '#c6b88c', edge: '#6f6543', tag: 'CB' },   // ~73 ft lumber/centerbeam
+  autorack:   { len: 75, fill: '#9fb4c6', edge: '#566875', tag: 'AR' },   // ~89 ft autorack / car carrier
+};
+export const carLen = (type) => (TYPES[type] || TYPES.box).len;
 
 // Lead arclength landmarks (the lead is the first segment of every engine route).
 export const S_FOOT = Math.abs(FOOT.x - LEAD_LEFT);   // arclength lead-left → ladder foot
 export const REST_DEFAULT = LEAD_REST - LEAD_LEFT;    // empty engine's resting arclength
+export const LEAD_CLEAR = S_FOOT - CLEAR - ENGLEN / 2; // max cut length the lead holds clear (px, CROR 114)
 
 // Where the engine (with a cut of pixel length `cutLen`) rests on the lead so the
 // whole cut stays clear of the ladder foul point. Backs off-frame as the cut grows.

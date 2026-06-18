@@ -82,9 +82,10 @@ Tunable constants (prototype values): canvas `W≈1340 × H≈460`; track length
 
 ## 4. Cars
 
-- **Variable length.** Standard ≈ 50 ft; **lumber / centerbeam ≈ 73 ft; autorack / car‑carrier ≈ 89 ft.** Most cars standard. Cars lay out by **cumulative real length** (a car’s neighbours never overlap; adjacent centres differ by half the sum of the two lengths).
-- **Loaded vs empty.** Each car is loaded or empty. **Visual: loaded = solid/filled body, empty = hollow/dark.** Loaded/empty drives blocking and kick limits (§5, §6).
-- A car is just a label + `{length, loaded}`. Position is derived, never stored per‑car (it’s `track head + cumulative` or `engine head + cumulative`).
+- **Car TYPES with real lengths (built 2026‑06‑18).** Each car has a type → length (px ≈ ft·0.84): **box ≈50 ft (42px) · hopper ≈56 (47) · tank ≈60 (50) · centerbeam/lumber ≈73 (61) · autorack/car‑carrier ≈89 (75).** Defined in `geometry.TYPES` (length + fill colour + tag); a car renders at its real size and is colour‑coded by type. Variety across the set (not every type on every puzzle), and **like cars grouped** in cuts (a string of tankers, a pair of autoracks…) the way a yard blocks them.
+- **All position/foul/lead/spot maths are length‑aware** — `pos[]` near‑edges advance by each car's length; spot fit / shove cascade / capacity / lead‑clear all sum per‑car lengths. `state.type[label]` holds the type; `carLen(type)` the px. Layout DSL: `'MARK'` = box, `['MARK','type']` = typed (SPEC §9).
+- **Loaded vs empty** (P4) — solid vs hollow; drives blocking and kick limits (§5, §6).
+- **⚠ Tanker / car‑type kicking (P2, to verify):** certain cars can't be kicked — **CROR 113.4 + special instructions + dangerous‑goods rules** (the TSB hopper bell‑crank case is one precedent; loaded tank / DG cars are generally not kicked). Kicking isn't built yet; **confirm the exact restriction against the Jan 2025 CROR + SME before it ships as a rule.**
 
 ---
 
@@ -198,7 +199,11 @@ state = {
                                           //   DEEP and varied — never stacked at the throat.
   loads:  ['A','B','C'],                  // which cars are loaded (P4); omit ⇒ all loaded
   inbound:{ cars:['C','D'], length:20, to:'AS74' },  // optional road set-out (P6)
-  goal:   { track:'AS73', cars:[…], ordered?:true, depart?:true },
+  goal:   { track:'AS73', cars:[…], ordered?:true, depart?:true },  // cars = the TRUTH
+  listed: [{ listedMark, listedTrack, trueMark, trueTrack, error:'location'|'mark'|null }],
+                                          // optional #7 switch list. What the paper says
+                                          // (may be wrong); player flags bad lines + certifies
+                                          // before moves unlock. The yard (start/goal) is truth.
   par:    <min MOVES>,                    // VERIFIED by the solver (see below)
   opt:    [['pull','AS74',2], …],         // the min-move (then min-joint) line, for "Watch optimal"
 }
@@ -217,9 +222,9 @@ state = {
 - **No overlap / no magic sliding (as built):** the loco always trails on the *lead* side of its cut and **stops at the coupling point** — it never drives past it into standing cars. A cut being shoved by a SPOT is **contact‑gated**: the standing cars don't start sliding until the loco's cut actually reaches them. At rest the loco backs off via `restS(cutLen)` so its held cut stays clear of the ladder foot. Labels render on dark pills so nothing on the canvas obscures them.
 
 ### Solver & verification (do this for every puzzle)
-- **Solver = Dijkstra over states, cost = (moves, then joints).** Returns **par (min moves)** and the optimal line (`opt`). It **imports the real `src/model.js`** (Node ESM — model/geometry have no DOM deps) and applies the actual `pull`/`spot`, so there is **zero divergence** between solver and game. Lining is auto‑satisfied per move (ignored for solvability); foul/lead/capacity, securing, and the win rule come for free from the real engine.
-- **Harness:** for each puzzle, assert the declared `par`/`opt` match the solver (optimal), and replay `opt` through a fresh engine to confirm it **wins at exactly par**. Randomized rolls (offsets/marks) come online with the randomization tier (P4/#5).
-- Keep the solver as a Node script in `/tools`, rebuilt from the model when rules change. Run with `node tools/solve.mjs` (repo has `package.json {"type":"module"}` for ESM imports — static site is unaffected).
+- **Robust set of FIXED, authored puzzles — NOT runtime generation.** We abandoned par‑per‑seed / random generation (2026‑06‑18, Jordan's call): it forced a search prune that made *clear‑a‑track* puzzles impossible, and par‑per‑seed was hard to verify reliably. Instead we ship many hand‑authored puzzles, each with `par`/`opt` baked in and **solver‑verified**.
+- **Solver (`src/solver.js`, shared by browser‑none + the Node harness) = Dijkstra over states, cost = (moves, then joints).** It **imports the real `src/model.js`** (Node ESM, no DOM) and applies the actual `pull`/`spot` — zero divergence from the game. Sound prune for **build‑a‑track** goals: only pull tracks holding a goal car (or the goal track when it still holds a blocker), and only spot to the goal *or* (while stashing a non‑goal car) anywhere — so it solves **gather, clear‑a‑track, and dig** puzzles fast without exploring every distractor.
+- **Authoring + CI:** `node tools/solve.mjs` solves & verifies every puzzle; `--print` prints `par`/`opt` to bake into `puzzles.js`. It fails (exit 1) if any baked par/opt isn't optimal or `opt` doesn't win at par. Repo has `package.json {"type":"module"}` for ESM imports (static site unaffected).
 
 ### Sound
 Synthesized Web Audio: coupling clunk, kick roll, points click, win chime, refusal buzz, train horn. Lazy `AudioContext` resumed on first gesture; 🔊/🔇 toggle persisted in `localStorage`.
@@ -294,4 +299,5 @@ Every mechanic exists to drill a **conductor's instinct**. This is the spine; th
 - **Foul refused before animating** via `canPull`/`canSpot` in `precheck` (cited reason). Lead foul = `LEAD_CAP` (lead dead‑ends).
 - **Full, varied yards from the 2nd level on:** cuts sitting deep; mix of empty / a pair / a long cut / separated cuts; never stacked at the throat. Authored via the layout DSL (§9).
 - **Constants (px):** `CARLEN 42` (≈50 ft), `ENGLEN 64`, `CLEAR 30` (foul point), `TRACK_HEAD / SPOT_CLEAR 44` (clears the foul point), `LEAD_CAP 12` cars.
-- **Status:** P0 vertical slice playable & verified; 2 puzzles; par/opt hand‑authored and now **solver‑verified** (`tools/solve.mjs`). Sound + Watch‑optimal in. Pending: P1/P2 tiers, randomization (#5), scatter generator (#6), switch‑list‑error mechanic (#7).
+- **#7 "don't trust the switch list" (built 2026‑06‑18):** puzzles can carry a `listed` order that's wrong (**wrong location** or **look‑alike number**). The work‑order panel becomes an interactive checklist — the player taps the bad lines and **certifies** before any move unlocks ("Both": flag *then* work). A blind/incorrect certify is refused with the reason (e.g. "AS75 has no CN 318044"); a correct one reveals the truth and enables the job. Read the equipment, not the paper.
+- **Status (2026‑06‑18):** P0 + clear‑a‑track/dig + #7 + **car types (mixed sizes, grouped)** playable & verified. **6 authored puzzles** (gather, add‑to‑cut, full‑yard identify, clear‑a‑track, dig, switch‑list), all solver‑verified (par/opt unchanged by lengths). Runtime generation abandoned (`generate.js` removed). Sound + Watch‑optimal in. Pending: **expand to ~4 puzzles per layer** across the curriculum tiers; kicking (P2 rules, incl. car‑type kick restrictions); GitHub Pages live.

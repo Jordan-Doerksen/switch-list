@@ -1,39 +1,43 @@
 // model.js — the rules brain. State + moves (PULL / SPOT), switch lining (CROR
-// 104), securing (112), win + grading. Score = MOVES (the goal); JOINTS =
-// couplings (a second "also good" stat).
+// 104), securing (112), win + grading. Score = MOVES (the goal); JOINTS = couplings.
 //
-// Cars carry an explicit near-edge position (px from their switch), so a car only
-// moves when it's physically pulled or pushed — never on its own — and a track can
-// hold separated cuts (gaps between groups), not one block jammed at the throat.
+// Cars carry an explicit near-edge position (px from their switch) AND a TYPE with a
+// real length — so a yard of mixed sizes (box / hopper / tank / centerbeam / autorack)
+// lays out and works correctly, a car only moves when pushed, and tracks can hold
+// separated cuts.
 
-import {
-  TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CAP, TRACK_RIGHT, switchPos,
-} from './geometry.js';
+import { TRACK_IDS, NTRACK, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen } from './geometry.js';
 
-// puzzle.start[id] is a layout list: strings are cars (throat→deep), numbers are
-// gaps in px. A leading number sets the first car's near-edge offset from the
-// switch (else SPOT_CLEAR). e.g. [200,'A','B'] = two cars sitting deep;
-// [60,'A',90,'B'] = a car, a 90px gap, then another car (two separated cuts).
+export const lenOf = (state, label) => carLen(state.type[label]);
+
+// puzzle.start[id] is a layout list: a number = a gap in px (a leading number =
+// how far off the switch the first car sits); a string = a box car by that mark;
+// an [mark, type] pair = a car of that type. e.g.
+//   AS72: [200, 'CN 41', ['GATX 90','tank'], ['TTGX 5','autorack']]
 function layout(entries) {
-  const cars = [], pos = [];
+  const cars = [], pos = [], types = {};
   let cursor = null;
   for (const e of entries) {
-    if (typeof e === 'number') cursor = (cursor == null ? e : cursor + e);
-    else { if (cursor == null) cursor = SPOT_CLEAR; cars.push(e); pos.push(cursor); cursor += CARLEN; }
+    if (typeof e === 'number') { cursor = cursor == null ? e : cursor + e; continue; }
+    const mark = Array.isArray(e) ? e[0] : e;
+    const type = Array.isArray(e) ? (e[1] || 'box') : 'box';
+    if (cursor == null) cursor = SPOT_CLEAR;
+    cars.push(mark); pos.push(cursor); types[mark] = type;
+    cursor += carLen(type);
   }
-  return { cars, pos };
+  return { cars, pos, types };
 }
 
 export function freshState(puzzle) {
-  const tracks = {}, pos = {}, secured = {}, lined = {};
+  const tracks = {}, pos = {}, secured = {}, lined = {}, type = {};
   for (let i = 0; i < NTRACK; i++) {
     const id = TRACK_IDS[i];
     const L = layout((puzzle.start && puzzle.start[id]) || []);
-    tracks[id] = L.cars; pos[id] = L.pos;       // parallel arrays, throat→deep
+    tracks[id] = L.cars; pos[id] = L.pos; Object.assign(type, L.types);
     secured[id] = (puzzle.startSecured && puzzle.startSecured[id]) || tracks[id].length >= 2;
     lined[id] = 'normal';
   }
-  return { tracks, pos, engine: [], secured, lined, moves: 0, joints: 0, msg: '', won: false };
+  return { tracks, pos, type, engine: [], secured, lined, moves: 0, joints: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -52,26 +56,30 @@ export function routeReady(state, id) {
   return { ok: true, msg: '' };
 }
 
-// --- Spot planning (pure) -------------------------------------------------
-// Where your n cars land, and how the standing cut shifts. Onto a standing cut:
-// couple in front if there's room clear of the foul point; otherwise SHOVE the cut
-// deeper just enough (cascading into deeper cuts only where it actually contacts
-// them — separations that aren't touched are preserved).
+// --- Spot planning (pure, length-aware) -----------------------------------
+// Where your n cars land and how a standing cut shifts. Couple in front if there's
+// room clear of the foul point, else SHOVE the cut deeper just enough (cascading
+// only where it actually contacts cars — separations that aren't touched are kept).
 export function spotPlan(state, id, n) {
-  const P = state.pos[id];
-  if (P.length === 0) {
-    const yourPos = Array.from({ length: n }, (_, k) => SPOT_CLEAR + k * CARLEN);
-    return { yourPos, newStanding: [], shove: false, deepEdge: SPOT_CLEAR + n * CARLEN };
+  const P = state.pos[id], T = state.tracks[id];
+  const yourCars = state.engine.slice(state.engine.length - n);
+  const yourLens = yourCars.map((c) => lenOf(state, c));
+  const yourTotal = yourLens.reduce((a, b) => a + b, 0);
+  const placeYour = (nearEdge) => { const out = []; let c = nearEdge; for (const L of yourLens) { out.push(c); c += L; } return out; };
+  const standingDeepEdge = (posArr) => (T.length ? posArr[T.length - 1] + lenOf(state, T[T.length - 1]) : 0);
+
+  if (T.length === 0) {
+    const yourPos = placeYour(SPOT_CLEAR);
+    return { yourPos, newStanding: [], shove: false, deepEdge: SPOT_CLEAR + yourTotal };
   }
   const p0 = P[0];
-  if (p0 - n * CARLEN >= CLEAR) {                          // room in front — cut stays put
-    const yourPos = Array.from({ length: n }, (_, k) => p0 - (n - k) * CARLEN);
-    return { yourPos, newStanding: P.slice(), shove: false, deepEdge: P[P.length - 1] + CARLEN };
+  if (p0 - yourTotal >= CLEAR) {                       // room in front — cut stays put
+    return { yourPos: placeYour(p0 - yourTotal), newStanding: P.slice(), shove: false, deepEdge: standingDeepEdge(P) };
   }
-  const yourPos = Array.from({ length: n }, (_, k) => SPOT_CLEAR + k * CARLEN);
-  const newStanding = []; let prevFar = SPOT_CLEAR + n * CARLEN;
-  for (const op of P) { const np = Math.max(op, prevFar); newStanding.push(np); prevFar = np + CARLEN; }
-  return { yourPos, newStanding, shove: true, deepEdge: newStanding[newStanding.length - 1] + CARLEN };
+  const yourPos = placeYour(SPOT_CLEAR);               // shove the cut back
+  const newStanding = []; let prevFar = SPOT_CLEAR + yourTotal;
+  for (let k = 0; k < T.length; k++) { const np = Math.max(P[k], prevFar); newStanding.push(np); prevFar = np + lenOf(state, T[k]); }
+  return { yourPos, newStanding, shove: true, deepEdge: standingDeepEdge(newStanding) };
 }
 
 // --- Validators (no mutation) ---------------------------------------------
@@ -81,8 +89,9 @@ export function canPull(state, id, n) {
   const have = state.tracks[id].length;
   if (n < 1) return { ok: false, msg: 'Pull at least one car.' };
   if (n > have) return { ok: false, msg: `${id} only has ${have} car${have === 1 ? '' : 's'} to pull.` };
-  if (state.engine.length + n > LEAD_CAP)                  // CROR 114 — lead foul (dead-ends, can't shove)
-    return { ok: false, msg: `The lead won't hold ${state.engine.length + n} cars clear of the ladder — won't clear the switch (CROR 114).` };
+  const cutLen = [...state.engine, ...state.tracks[id].slice(0, n)].reduce((a, c) => a + lenOf(state, c), 0);
+  if (cutLen > LEAD_CLEAR)                              // CROR 114 — lead foul (lead dead-ends, can't shove)
+    return { ok: false, msg: `That cut is too long for the lead to hold clear of the ladder — won't clear the switch (CROR 114).` };
   return { ok: true, msg: '' };
 }
 
@@ -99,21 +108,17 @@ export function canSpot(state, id, n) {
 }
 
 // --- Moves ----------------------------------------------------------------
-// PULL n: couple the throat cut, pull n cars onto the lead. Cars left behind keep
-// their exact positions (they're not touched). +1 joint.
 export function pull(state, id, n) {
   const v = canPull(state, id, n);
   if (!v.ok) return refuse(state, v.msg);
   const taken = state.tracks[id].splice(0, n);
-  state.pos[id].splice(0, n);                              // remaining cars stay put
+  state.pos[id].splice(0, n);                          // remaining cars stay put
   state.engine.push(...taken);
-  state.joints += 1;                                       // coupled on (CROR 113.0/113.2)
+  state.joints += 1;
   if (state.tracks[id].length < 2) state.secured[id] = false;
   return commit(state, `Pulled ${n} from ${id}.`);
 }
 
-// SPOT n: shove the far n cars of the cut in at the throat (shoving any standing
-// cut back only as far as needed). +1 joint if coupling onto standing cars.
 export function spot(state, id, n) {
   const v = canSpot(state, id, n);
   if (!v.ok) return refuse(state, v.msg);

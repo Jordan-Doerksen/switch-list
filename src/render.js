@@ -4,7 +4,7 @@
 
 import {
   W, H, LEAD_Y, LEAD_LEFT, FOOT, NTRACK, TRACK_IDS, switchPos, trackY,
-  TRACK_RIGHT, MAIN_OUT, CARLEN, ENGLEN, CLEAR, LEAD_ROUTE, restS, polyAt,
+  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, LEAD_ROUTE, restS, polyAt, TYPES, carLen,
 } from './geometry.js';
 
 const C = {
@@ -36,8 +36,9 @@ export function render(ctx, state, puzzle, opts = {}) {
 
   // the engine + its cut: animated train if a move is playing, else at rest
   // (backed off far enough that the held cut stays clear of the ladder foul point)
-  if (opts.anim) drawTrain(ctx, opts.anim.route, opts.anim.engS, opts.anim.cut);
-  else drawTrain(ctx, LEAD_ROUTE, restS(state.engine.length * CARLEN), state.engine);
+  const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
+  if (opts.anim) drawTrain(ctx, opts.anim.route, opts.anim.engS, opts.anim.cut, state);
+  else drawTrain(ctx, LEAD_ROUTE, restS(cutLen), state.engine, state);
 }
 
 function drawRoutes(ctx) {
@@ -104,7 +105,7 @@ function drawTrackLabels(ctx, state, showSecured) {
   }
 }
 
-function carRect(ctx, x, y, angle, len, label, kind) {
+function carRect(ctx, x, y, angle, len, label, kind, type) {
   ctx.save();
   ctx.translate(x, y); ctx.rotate(angle);
   const h = 20;
@@ -114,7 +115,8 @@ function carRect(ctx, x, y, angle, len, label, kind) {
     ctx.fillStyle = C.head;                                  // headlight
     ctx.beginPath(); ctx.arc(-len / 2 + 5, 0, 2.6, 0, Math.PI * 2); ctx.fill();
   } else {
-    ctx.fillStyle = C.car; ctx.strokeStyle = C.carEdge; ctx.lineWidth = 1.5;
+    const ty = TYPES[type] || TYPES.box;
+    ctx.fillStyle = ty.fill; ctx.strokeStyle = ty.edge; ctx.lineWidth = 1.5;
     roundRect(ctx, -len / 2, -h / 2, len, h, 3); ctx.fill(); ctx.stroke();
     if (label) {
       const disp = label.split(' ').pop();   // the car number — how it's actually called
@@ -122,6 +124,9 @@ function carRect(ctx, x, y, angle, len, label, kind) {
       let fs = 9; ctx.font = `700 ${fs}px ui-monospace, monospace`;
       while (ctx.measureText(disp).width > len - 8 && fs > 6) { fs -= 0.5; ctx.font = `700 ${fs}px ui-monospace, monospace`; }
       ctx.fillText(disp, 0, 0.5);
+      // tiny type tag at the throat end (helps tell sizes/types apart)
+      ctx.fillStyle = 'rgba(20,24,30,0.55)'; ctx.font = '700 6.5px ui-monospace, monospace';
+      ctx.textAlign = 'left'; ctx.fillText(ty.tag, -len / 2 + 3, -h / 2 + 5);
     }
   }
   ctx.restore();
@@ -141,20 +146,22 @@ function drawStandingCars(ctx, state, i, shove) {
   const shoving = shove && shove.id === id;                // this cut is being pushed
   for (let k = 0; k < cars.length; k++) {
     const nearEdge = shoving ? shove.from[k] + (shove.to[k] - shove.from[k]) * shove.prog : P[k];
-    carRect(ctx, sx + nearEdge + CARLEN / 2, y, 0, CARLEN, cars[k], 'car');
+    const w = carLen(state.type[cars[k]]);
+    carRect(ctx, sx + nearEdge + w / 2, y, 0, w, cars[k], 'car', state.type[cars[k]]);
   }
 }
 
 // Draw the loco at arclength engS along `route`, with `cut` trailing toward the
 // track (increasing s). cut[0] is nearest the loco.
-function drawTrain(ctx, route, engS, cut) {
+function drawTrain(ctx, route, engS, cut, state) {
   const loco = polyAt(route, engS);
   carRect(ctx, loco.x, loco.y, loco.angle, ENGLEN, null, 'loco');
   let s = engS + ENGLEN / 2;
   for (const label of cut) {
-    const p = polyAt(route, s + CARLEN / 2);
-    carRect(ctx, p.x, p.y, p.angle, CARLEN, label, 'car');
-    s += CARLEN;
+    const w = carLen(state.type[label]);
+    const p = polyAt(route, s + w / 2);
+    carRect(ctx, p.x, p.y, p.angle, w, label, 'car', state.type[label]);
+    s += w;
   }
 }
 
