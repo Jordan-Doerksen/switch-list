@@ -23,6 +23,7 @@ const $ = (id) => document.getElementById(id);
 function load(p) {
   puzzle = p; state = freshState(p); anim = null; busy = false; watching = false; setSpeed(1);
   ordered = !p.listed; flagged.clear();
+  const dep = $('depart'); dep.style.display = p.goal.depart ? '' : 'none'; dep.disabled = true;
   renderRules(); renderOrder(); syncBuilder(); paint(); banner('', '');
   $('readout').textContent = `Moves 0 / par ${p.par} · Joints 0`;
 }
@@ -50,6 +51,7 @@ $('work').addEventListener('click', () => {
   doMove(kind, id, n);
 });
 $('optimal').addEventListener('click', () => { resume(); watchOptimal(); });
+$('depart').addEventListener('click', () => { resume(); departOut(); });
 $('reset').addEventListener('click', () => { if (!busy) load(puzzle); });
 $('mute').addEventListener('click', () => { $('mute').textContent = toggleMute() ? '🔇' : '🔊'; });
 
@@ -143,18 +145,38 @@ async function watchOptimal() {
   }
   setSpeed(1); busy = false; watching = false;
   afterMove();
+  if (puzzle.goal.depart && checkWin(state, puzzle)) departOut();   // finish the demo by departing
 }
 
 function afterMove() {
   $('readout').textContent = `Moves ${state.moves} / par ${puzzle.par} · Joints ${state.joints}`;
   banner(state.msg, 'ok');
   syncBuilder(); paint();
-  if (checkWin(state, puzzle)) {
-    const g = grade(state, puzzle);
-    sfx.win();
-    const clean = state.joints <= bestJoints() ? ` — ${g.bonus}, clean` : ` · ${g.bonus}`;
-    banner(`${g.beatPar ? '✓ ' : ''}${g.head}${clean}`, g.beatPar ? 'win' : 'ok');
+  const done = checkWin(state, puzzle);
+  if (done && puzzle.goal.depart) {
+    $('depart').disabled = false;                    // built in order — let them depart
+    banner(`✓ Outbound built${puzzle.goal.ordered ? ' in order' : ''} — call Depart ▸ to leave.`, 'win');
+  } else {
+    $('depart').disabled = true;
+    if (done) winBanner();
   }
+}
+
+function winBanner() {
+  const g = grade(state, puzzle);
+  sfx.win();
+  const clean = state.joints <= bestJoints() ? ` — ${g.bonus}, clean` : ` · ${g.bonus}`;
+  banner(`${g.beatPar ? '✓ ' : ''}${g.head}${clean}`, g.beatPar ? 'win' : 'ok');
+}
+
+// Depart — the deliberate final call once the outbound is assembled (P6).
+function departOut() {
+  if (busy || !puzzle.goal.depart || !checkWin(state, puzzle)) return;
+  const g = grade(state, puzzle);
+  sfx.win();
+  const clean = state.joints <= bestJoints() ? ` — ${g.bonus}, clean` : ` · ${g.bonus}`;
+  banner(`✓ Departed out the lead — ${g.head}${clean}`, g.beatPar ? 'win' : 'ok');
+  $('depart').disabled = true;
 }
 
 // rough "clean" benchmark until the solver owns it

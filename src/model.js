@@ -185,14 +185,16 @@ function refuse(state, msg) { state.msg = msg; return { ok: false, msg }; }
 function commit(state, msg) { state.moves += 1; state.msg = msg; return { ok: true, msg }; }
 
 // --- Win + grade ----------------------------------------------------------
+// "Complete" = the goal consist is assembled on the goal track and the loco is
+// empty. goal.ordered ⇒ exact throat→deep order (manifest / blocking); else set.
+// (A goal.depart puzzle still needs the player to call Depart — that's UI, not here.)
 export function checkWin(state, puzzle) {
   const g = puzzle.goal;
   if (state.engine.length > 0) return false;
-  const have = state.tracks[g.track].slice().sort();
-  const want = g.cars.slice().sort();
-  const same = have.length === want.length && have.every((c, k) => c === want[k]);
-  if (same) state.won = true;
-  return state.won;
+  const have = state.tracks[g.track];
+  if (g.ordered) return have.length === g.cars.length && have.every((c, k) => c === g.cars[k]);
+  const h = have.slice().sort(), w = g.cars.slice().sort();
+  return h.length === w.length && h.every((c, k) => c === w[k]);
 }
 
 export function grade(state, puzzle) {

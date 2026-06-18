@@ -68,6 +68,9 @@
   button.go:hover { background: #2356e6; }
   button#optimal { background: #14313a; border-color: #1d5563; color: #aee9f6; }
   button#optimal:hover { background: #1a3d48; }
+  button#depart { background: #1f4a3c; border-color: #2a6b54; color: #bdf0db; }
+  button#depart:hover { background: #245741; }
+  button#depart:disabled { opacity: .4; cursor: default; }
   button:hover { border-color: #3a4554; }
   .spacer { flex: 1; }
   .banner {
@@ -123,6 +126,7 @@
       <select id="track" title="Which track"></select>
       <button class="go" id="work">Work it ▸</button>
       <button id="optimal" title="Auto-line and play the fewest-moves line in slow motion">▶ Watch optimal</button>
+      <button id="depart" title="Depart the assembled outbound out the lead" style="display:none">Depart ▸</button>
       <span class="spacer"></span>
       <button id="reset">Reset</button>
       <button id="mute" title="Sound">🔊</button>

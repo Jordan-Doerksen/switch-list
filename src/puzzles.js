@@ -16,6 +16,7 @@ export const RULES = {
   kick:   { kind: 'cror', cite: 'CROR 113.4 / 113.5', label: 'Kick only onto a secured cut; not every car can be kicked' },
   kickable: { kind: 'si', cite: 'Kickable tracks',    label: 'Kick only where the special instruction allows (⚡)' },
   loads:    { kind: 'si', cite: 'Loads & empties',     label: 'Solid = loaded, hollow = empty. Don’t kick a load into empties; kick ≤5 (≤3 loaded)' },
+  order:    { kind: 'si', cite: 'Manifest / blocking', label: 'Build the outbound in order, then DEPART out the lead' },
 };
 
 export const PUZZLES = [
@@ -144,5 +145,21 @@ export const PUZZLES = [
     goal: { track: 'AS73', cars: ['CN 70010', 'CN 70028', 'CN 81002', 'CN 81044'] },
     par: 2,
     opt: [['pull', 'AS71', 2], ['kick', 'AS73', 2]],
+  },
+  {
+    id: 'p6-road', tier: 6,
+    title: 'Build the outbound & depart',
+    hint: 'A road train set out CN 401002 & 401003 on AS73. Build your outbound on AS74 in MANIFEST ORDER — CN 401001 (front), then 401002, then 401003 — so pick them up in that order. When it’s built, call Depart ▸ to leave out the lead.',
+    rules: ['order', 'line', 'speed', 'couple', 'shove'],
+    start: {
+      AS72: [180, 'CN 401001'],                                   // your head-end car
+      AS73: [200, 'CN 401002', 'CN 401003'],                      // set out by the inbound (a block)
+      AS71: [160, ['GATX 5510', 'tank'], ['GATX 5528', 'tank']],
+      AS75: [220, ['CN 88010', 'hopper', 'E'], ['CN 88028', 'hopper', 'E']],
+      AS76: [180, ['ETTX 7001', 'autorack']],
+    },
+    goal: { track: 'AS74', cars: ['CN 401001', 'CN 401002', 'CN 401003'], ordered: true, depart: true },
+    par: 3,
+    opt: [['pull', 'AS72', 1], ['pull', 'AS73', 2], ['spot', 'AS74', 3]],
   },
 ];
