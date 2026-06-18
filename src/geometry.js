@@ -32,8 +32,9 @@ export const MAIN_OUT = { x: beyond.x + STEP_X * 3, y: beyond.y - STEP_Y * 3 };
 export const CARLEN = 42;                // legacy default = a 50 ft box car
 export const ENGLEN = 64;
 export const CLEAR = 30;                 // clearance / foul point: this far out from a switch
-export const TRACK_HEAD = 44;            // default gap switch → throat car (CLEARS the foul point)
-export const SPOT_CLEAR = 44;            // where a fresh spot lands on an empty track (≥ CLEAR)
+export const TRACK_HEAD = 120;           // default gap switch → throat car (well clear of the foul point)
+export const SPOT_CLEAR = 120;           // where a fresh spot lands — shoved well in, clear of the foul point
+                                         // (≫ CLEAR; a crew never leaves a cut crowding the points — CROR 114)
 export const LEAD_REST = 120;            // engine's resting x on the lead (empty)
 
 // kick: may this type be kicked? box/hopper yes; tank/autorack/centerbeam NO
