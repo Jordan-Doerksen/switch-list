@@ -35,6 +35,7 @@ class Heap {
 export function solve(puzzle, { maxMoves = 10, maxStates = 120000 } = {}) {
   const goalTrack = puzzle.goal.track;
   const goalCars = new Set(puzzle.goal.cars);
+  const depart = !!puzzle.goal.depart;          // DEPART: the consist rides on the engine, not a track
   const start = freshState(puzzle);
   const h = new Heap(); h.push({ s: start, path: [] });
   const best = new Map([[key(start), [0, 0]]]);
@@ -47,18 +48,19 @@ export function solve(puzzle, { maxMoves = 10, maxStates = 120000 } = {}) {
 
     for (const T of TRACK_IDS) {
       const hasGoalCar = cur.s.tracks[T].some((c) => goalCars.has(c));
-      const goalHasBlocker = T === goalTrack && cur.s.tracks[T].some((c) => !goalCars.has(c));
+      const goalHasBlocker = !depart && T === goalTrack && cur.s.tracks[T].some((c) => !goalCars.has(c));
       if (hasGoalCar || goalHasBlocker)
         for (let n = 1; n <= cur.s.tracks[T].length; n++) step(cur, 'pull', T, n, h, best);
     }
     const stashing = cur.s.engine.some((c) => !goalCars.has(c));
     for (const D of TRACK_IDS) {
-      if (D === goalTrack || stashing)
+      // build on the goal track (non-depart), or stash a non-goal car anywhere
+      if ((!depart && D === goalTrack) || stashing)
         for (let n = 1; n <= cur.s.engine.length; n++) step(cur, 'spot', D, n, h, best);
     }
-    // KICK onto the goal (when kickable + secured + kickable types) — same moves as
-    // a spot but 0 joints, so the solver picks it for the cleaner line.
-    for (let n = 1; n <= cur.s.engine.length; n++) step(cur, 'kick', goalTrack, n, h, best);
+    // KICK onto the goal (non-depart only; same moves as a spot but 0 joints, so the
+    // solver picks it for the cleaner line). DEPART builds on the engine — no kick.
+    if (!depart) for (let n = 1; n <= cur.s.engine.length; n++) step(cur, 'kick', goalTrack, n, h, best);
   }
   return null;
 }

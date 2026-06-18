@@ -4,7 +4,7 @@
 
 import {
   W, H, LEAD_Y, LEAD_LEFT, FOOT, NTRACK, TRACK_IDS, switchPos, trackY,
-  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, LEAD_ROUTE, restS, polyAt, TYPES, carLen,
+  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, LEAD_ROUTE, THROUGH_ROUTE, restS, polyAt, TYPES, carLen,
 } from './geometry.js';
 
 const C = {
@@ -39,6 +39,22 @@ export function render(ctx, state, puzzle, opts = {}) {
   const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
   if (opts.anim) drawTrain(ctx, opts.anim.route, opts.anim.engS, opts.anim.cut, state);
   else drawTrain(ctx, LEAD_ROUTE, restS(cutLen), state.engine, state);
+
+  if (opts.intro != null) drawIntroTrain(ctx, opts.intro);   // inbound road train (cinematic)
+}
+
+// A generic road train (loco + a few cars) sweeping the through route — flavor for
+// the inbound set-out / run-through. Trails behind the loco (toward the main).
+function drawIntroTrain(ctx, engS) {
+  const L = 42;
+  const loco = polyAt(THROUGH_ROUTE, engS);
+  carRect(ctx, loco.x, loco.y, loco.angle, ENGLEN, null, 'loco');
+  let s = engS - ENGLEN / 2;
+  for (let k = 0; k < 5; k++) {
+    const p = polyAt(THROUGH_ROUTE, s - L / 2);
+    carRect(ctx, p.x, p.y, p.angle, L, null, 'car', k % 2 ? 'hopper' : 'box');
+    s -= L;
+  }
 }
 
 function drawRoutes(ctx) {

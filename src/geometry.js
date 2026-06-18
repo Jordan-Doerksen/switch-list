@@ -78,6 +78,16 @@ export function engineRoute(i) {
 // The lead-only route the engine rests on between jobs.
 export const LEAD_ROUTE = [{ x: LEAD_LEFT, y: LEAD_Y }, { x: FOOT.x + 40, y: LEAD_Y }];
 
+// Through route — the road: in off the main (top-right), down the ladder, out the
+// lead (bottom-left). Used for the inbound-arrival cinematic; extrapolates off-frame
+// at both ends (start s<0 beyond MAIN_OUT, finish s>len past the lead bumper).
+export const THROUGH_ROUTE = [
+  MAIN_OUT,
+  ...Array.from({ length: NTRACK }, (_, k) => switchPos(NTRACK - 1 - k)),
+  { x: FOOT.x, y: FOOT.y },
+  { x: LEAD_LEFT, y: LEAD_Y },
+];
+
 // polyAt(route, s): point + heading at arclength `s` along a polyline.
 // Extrapolates for s<0 and s>length so equipment can sit off-frame (SPEC §3).
 export function polyAt(route, s) {

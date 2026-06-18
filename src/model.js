@@ -185,16 +185,20 @@ function refuse(state, msg) { state.msg = msg; return { ok: false, msg }; }
 function commit(state, msg) { state.moves += 1; state.msg = msg; return { ok: true, msg }; }
 
 // --- Win + grade ----------------------------------------------------------
-// "Complete" = the goal consist is assembled on the goal track and the loco is
-// empty. goal.ordered ⇒ exact throat→deep order (manifest / blocking); else set.
-// (A goal.depart puzzle still needs the player to call Depart — that's UI, not here.)
+const sameSet = (a, b) => { const x = a.slice().sort(), y = b.slice().sort(); return x.length === y.length && x.every((c, k) => c === y[k]); };
+const sameOrder = (a, b) => a.length === b.length && a.every((c, k) => c === b[k]);
+
+// "Complete":
+//  • DEPART goal — the outbound rides on the ENGINE (you leave with it coupled, no
+//    final spot). Engine holds the consist (in manifest order if `ordered`).
+//  • otherwise — the consist is built on the goal track and the loco is empty.
+// goal.ordered ⇒ exact order (manifest / blocking); else set. The Depart call is UI.
 export function checkWin(state, puzzle) {
   const g = puzzle.goal;
+  if (g.depart) return g.ordered ? sameOrder(state.engine, g.cars) : sameSet(state.engine, g.cars);
   if (state.engine.length > 0) return false;
   const have = state.tracks[g.track];
-  if (g.ordered) return have.length === g.cars.length && have.every((c, k) => c === g.cars[k]);
-  const h = have.slice().sort(), w = g.cars.slice().sort();
-  return h.length === w.length && h.every((c, k) => c === w[k]);
+  return g.ordered ? sameOrder(have, g.cars) : sameSet(have, g.cars);
 }
 
 export function grade(state, puzzle) {

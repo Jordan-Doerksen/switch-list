@@ -2,7 +2,7 @@
 // builder (PULL/SPOT/count/track), the two counters, rule chips, win + reset.
 // Command-and-watch: you line the road and call the move; the engine works it.
 
-import { W, H, NTRACK, TRACK_IDS, switchPos, engineRoute, ENGLEN, restS, carLen } from './geometry.js';
+import { W, H, NTRACK, TRACK_IDS, switchPos, engineRoute, ENGLEN, restS, carLen, LEAD_ROUTE, THROUGH_ROUTE, routeLength } from './geometry.js';
 import { freshState, lineSwitch, canPull, canSpot, canKick, spotPlan, pull, spot, kick, checkWin, grade } from './model.js';
 import { render } from './render.js';
 import { play, setSpeed } from './anim.js';
@@ -17,18 +17,31 @@ canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
 let puzzle, state, anim = null, busy = false, watching = false;
 let ordered = true;                 // is the switch list verified? (true when there's no list to check)
 const flagged = new Set();          // indices the player has flagged as wrong
+let introS = null;                  // inbound road train's arclength during the arrival cinematic
 
 const $ = (id) => document.getElementById(id);
 
 function load(p) {
-  puzzle = p; state = freshState(p); anim = null; busy = false; watching = false; setSpeed(1);
+  puzzle = p; state = freshState(p); anim = null; introS = null; busy = false; watching = false; setSpeed(1);
   ordered = !p.listed; flagged.clear();
   const dep = $('depart'); dep.style.display = p.goal.depart ? '' : 'none'; dep.disabled = true;
   renderRules(); renderOrder(); syncBuilder(); paint(); banner('', '');
   $('readout').textContent = `Moves 0 / par ${p.par} · Joints 0`;
+  arrivalCinematic();               // flavor: the road train sets out + runs through
 }
 
-function paint() { render(ctx, state, puzzle, anim ? { anim } : {}); }
+function paint() { render(ctx, state, puzzle, { anim, intro: introS }); }
+
+// Inbound road train sweeps the through route (off top-right → down the ladder → out
+// the lead). Non-blocking flavor; self-clears even if rAF is throttled.
+function arrivalCinematic() {
+  if (!puzzle.goal.depart) { introS = null; return; }
+  const len = routeLength(THROUGH_ROUTE);
+  let finished = false;
+  const finish = () => { if (finished) return; finished = true; introS = null; paint(); };
+  play([{ dur: 2600, fn: (t) => { introS = -220 + (len + 460) * t; } }], { onFrame: paint, onDone: finish });
+  setTimeout(finish, 3600);
+}
 
 // --- input: line a switch by clicking its target -------------------------
 canvas.addEventListener('click', (e) => {
@@ -169,14 +182,22 @@ function winBanner() {
   banner(`${g.beatPar ? '✓ ' : ''}${g.head}${clean}`, g.beatPar ? 'win' : 'ok');
 }
 
-// Depart — the deliberate final call once the outbound is assembled (P6).
+// Depart — the deliberate final call once the outbound is assembled (P6). The
+// consist is already coupled to the loco; it leaves out the lead, off-frame.
 function departOut() {
   if (busy || !puzzle.goal.depart || !checkWin(state, puzzle)) return;
   const g = grade(state, puzzle);
   sfx.win();
   const clean = state.joints <= bestJoints() ? ` — ${g.bonus}, clean` : ` · ${g.bonus}`;
-  banner(`✓ Departed out the lead — ${g.head}${clean}`, g.beatPar ? 'win' : 'ok');
+  banner(`✓ Departed out the lead — ${g.head}${clean}`, g.beatPar ? 'win' : 'ok');   // win registered now
   $('depart').disabled = true;
+  // flavor: pull the whole train out the lead, off-frame left
+  busy = true;
+  const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
+  const startS = restS(cutLen), endS = -(cutLen + ENGLEN + 220);
+  const cut = state.engine.slice();
+  play([{ dur: 1300, fn: (t) => { anim = { route: LEAD_ROUTE, engS: startS + (endS - startS) * t, cut }; } }],
+    { onFrame: paint, onDone: () => { anim = null; busy = false; paint(); } });
 }
 
 // rough "clean" benchmark until the solver owns it
@@ -270,16 +291,16 @@ function renderVerifiedOrder() {
 function renderWorkOrder() {
   const g = puzzle.goal;
   const src = {};
-  for (const [trk, cars] of Object.entries(puzzle.start || {})) for (const c of cars) src[c] = trk;
+  for (const [trk, entries] of Object.entries(puzzle.start || {}))
+    for (const e of entries) { const m = Array.isArray(e) ? e[0] : e; if (typeof m === 'string') src[m] = trk; }
   const from = [...new Set(g.cars.map((c) => src[c]).filter(Boolean))];
   const nums = g.cars.map((c) => c.split(' ').pop());
-  const verb = g.depart ? 'Build & depart' : 'Build';
-  $('workorder').innerHTML =
-    `<div class="wo-top"><span class="wo-tag">WORK ORDER</span> <span class="wo-id">${puzzle.id.toUpperCase()}</span> · ${puzzle.title}</div>`
-    + `<div class="wo-job">${verb} <b>${g.track}</b> — gather <b>${nums.join(' · ')}</b> onto it`
-    + `${from.length ? ` <span class="wo-from">(now on ${from.join(', ')})</span>` : ''}.</div>`
-    + `<div class="wo-meta">Target <b>${puzzle.par} move${puzzle.par === 1 ? '' : 's'}</b> (par) — fewest moves wins.`
-    + `<span class="wo-tip">${puzzle.hint}</span></div>`;
+  const head = `<div class="wo-top"><span class="wo-tag">WORK ORDER</span> <span class="wo-id">${puzzle.id.toUpperCase()}</span> · ${puzzle.title}</div>`;
+  const meta = `<div class="wo-meta">Target <b>${puzzle.par} move${puzzle.par === 1 ? '' : 's'}</b> (par) — fewest moves wins.<span class="wo-tip">${puzzle.hint}</span></div>`;
+  const job = g.depart
+    ? `<div class="wo-job">Build the outbound${g.ordered ? ' in order' : ''} — gather <b>${nums.join(' · ')}</b> onto your train${from.length ? ` <span class="wo-from">(set out on ${from.join(', ')})</span>` : ''}, then <b>Depart ▸</b>.</div>`
+    : `<div class="wo-job">Build <b>${g.track}</b> — gather <b>${nums.join(' · ')}</b> onto it${from.length ? ` <span class="wo-from">(now on ${from.join(', ')})</span>` : ''}.</div>`;
+  $('workorder').innerHTML = head + job + meta;
 }
 
 function banner(text, tone) {

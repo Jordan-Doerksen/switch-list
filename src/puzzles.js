@@ -149,7 +149,7 @@ export const PUZZLES = [
   {
     id: 'p6-road', tier: 6,
     title: 'Build the outbound & depart',
-    hint: 'A road train set out CN 401002 & 401003 on AS73. Build your outbound on AS74 in MANIFEST ORDER — CN 401001 (front), then 401002, then 401003 — so pick them up in that order. When it’s built, call Depart ▸ to leave out the lead.',
+    hint: 'A road train set out CN 401002 & 401003 on AS73. Build your outbound in MANIFEST ORDER — CN 401001 (head), then 401002, then 401003 — so pick them up in that order onto your train. It stays coupled to you; don’t set it back down — just call Depart ▸ to leave out the lead.',
     rules: ['order', 'line', 'speed', 'couple', 'shove'],
     start: {
       AS72: [180, 'CN 401001'],                                   // your head-end car
@@ -158,8 +158,8 @@ export const PUZZLES = [
       AS75: [220, ['CN 88010', 'hopper', 'E'], ['CN 88028', 'hopper', 'E']],
       AS76: [180, ['ETTX 7001', 'autorack']],
     },
-    goal: { track: 'AS74', cars: ['CN 401001', 'CN 401002', 'CN 401003'], ordered: true, depart: true },
-    par: 3,
-    opt: [['pull', 'AS72', 1], ['pull', 'AS73', 2], ['spot', 'AS74', 3]],
+    goal: { cars: ['CN 401001', 'CN 401002', 'CN 401003'], ordered: true, depart: true },
+    par: 2,
+    opt: [['pull', 'AS72', 1], ['pull', 'AS73', 2]],
   },
 ];
