@@ -9,10 +9,12 @@ import { TRACK_IDS } from './geometry.js';
 function clone(s) {
   const tracks = {}, pos = {}, secured = {}, lined = {};
   for (const t of TRACK_IDS) { tracks[t] = s.tracks[t].slice(); pos[t] = s.pos[t].slice(); secured[t] = s.secured[t]; lined[t] = s.lined[t]; }
-  return { tracks, pos, type: s.type, loaded: s.loaded, kickable: s.kickable, kickLimit: s.kickLimit, engine: s.engine.slice(), secured, lined, moves: s.moves, joints: s.joints, msg: '', won: s.won };
+  return { tracks, pos, type: s.type, loaded: s.loaded, kickable: s.kickable, kickLimit: s.kickLimit, engine: s.engine.slice(), secured, lined, out: s.out, moves: s.moves, joints: s.joints, msg: '', won: s.won };
 }
 function autoLine(s, id) { for (const t of TRACK_IDS) s.lined[t] = (t === id) ? 'reverse' : 'normal'; }
-function key(s) { return TRACK_IDS.map((t) => s.tracks[t].join(',') + '@' + s.pos[t].join(',')).join(';') + '#' + s.engine.join(','); }
+// `out` is part of the state — two otherwise-equal positions cost differently next move
+// (a spotted-in engine must pull clear first), so they must not be merged.
+function key(s) { return TRACK_IDS.map((t) => s.tracks[t].join(',') + '@' + s.pos[t].join(',')).join(';') + '#' + s.engine.join(',') + (s.out ? '>' : '<'); }
 
 // binary min-heap on (moves, joints) — keeps the browser solve fast on full yards
 class Heap {

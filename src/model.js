@@ -45,7 +45,11 @@ export function freshState(puzzle) {
   const kickable = puzzle.kickable ? puzzle.kickable.slice() : [];
   const kl = puzzle.kickLimit || {};
   const kickLimit = { total: Math.min(5, kl.total ?? 5), loaded: Math.min(3, kl.loaded ?? 3) };
-  return { tracks, pos, type, loaded, engine: [], secured, lined, kickable, kickLimit, moves: 0, joints: 0, msg: '', won: false };
+  // engine `out` = sitting on the lead, clear of the tracks. Start out. A SPOT leaves the
+  // engine IN (it shoved the cut in and hasn't pulled out yet); the next move pays that
+  // pull-out as a +1 "reposition". So a finishing spot never charges its pull-out — that's
+  // why a 3-handling job (pull, pull, spot) is 5 engine-moves, not 6.
+  return { tracks, pos, type, loaded, engine: [], secured, lined, kickable, kickLimit, out: true, moves: 0, joints: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -124,7 +128,8 @@ export function pull(state, id, n) {
   state.engine.push(...taken);
   state.joints += 1;
   if (state.tracks[id].length < 2) state.secured[id] = false;
-  return commit(state, `Pulled ${n} from ${id}.`, 2);
+  const cost = (state.out ? 0 : 1) + 2; state.out = true;   // (pull clear if you were spotted in) + back in + pull out
+  return commit(state, `Pulled ${n} from ${id}.`, cost);
 }
 
 export function spot(state, id, n) {
@@ -137,7 +142,8 @@ export function spot(state, id, n) {
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
   if (onto) state.joints += 1;
   if (state.tracks[id].length >= 2) state.secured[id] = true;
-  return commit(state, `Spotted ${n} to ${id}.`, 2);
+  const cost = (state.out ? 0 : 1) + 1; state.out = false;  // (pull clear first if needed) + shove in; pull-out deferred until you leave
+  return commit(state, `Spotted ${n} to ${id}.`, cost);
 }
 
 // KICK n to T — shove and cut away; the cars coast onto a SECURED standing 2+ cut on
@@ -178,12 +184,16 @@ export function kick(state, id, n) {
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
   // no joint — the kicked cars coast on by themselves (that's the win vs spotting)
   state.secured[id] = true;                            // still a standing 2+ cut
-  return commit(state, `Kicked ${n} to ${id}.`, 1);
+  const cost = (state.out ? 0 : 1) + 1; state.out = true;   // (pull clear first if needed) + one shove, cars coast — no pull-out
+  return commit(state, `Kicked ${n} to ${id}.`, cost);
 }
 
 function refuse(state, msg) { state.msg = msg; return { ok: false, msg }; }
-// MOVES = engine direction-moves. A PULL or SPOT is back-in + pull-out = 2; a KICK is
-// shove-and-cut-away = 1 (no pull-out — that's the efficiency win for kicking).
+// MOVES = engine direction-moves (legs). Each op's cost is computed in pull/spot/kick from
+// the engine's `out` state: a PULL is back-in + pull-out (2); a SPOT is just the shove-in (1),
+// deferring its pull-out — paid as +1 the next time the engine moves; a KICK is one shove (1).
+// Net: a finishing spot stays 1 (no next move to pay the pull-out), which is why pull,pull,spot
+// is 5 — and kicking saves the deferred pull-out mid-job.
 function commit(state, msg, cost = 1) { state.moves += cost; state.msg = msg; return { ok: true, msg }; }
 
 // --- Win + grade ----------------------------------------------------------

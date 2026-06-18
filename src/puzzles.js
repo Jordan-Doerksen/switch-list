@@ -24,7 +24,7 @@ export const PUZZLES = [
   {
     id: 'p0-1', tier: 0,
     title: 'Make up the cut',
-    hint: 'Your four cars are split across AS72 and AS73. PULL one pair, PULL the other onto the same cut, then SPOT all four onto AS75. Three moves.',
+    hint: 'Your four cars are split across AS72 and AS73. PULL one pair, PULL the other onto the same cut, then SPOT all four onto AS75. Three handlings — par 5.',
     rules: ['line', 'speed', 'couple', 'shove'],
     start: {
       AS72: [180, 'CN 411002', 'CN 411040'],
@@ -32,13 +32,13 @@ export const PUZZLES = [
       AS76: [200, 'TILX 66108', 'TILX 66280'],
     },
     goal: { track: 'AS75', cars: ['CN 411002', 'CN 411040', 'GATX 88110', 'GATX 88128'] },
-    par: 6,
+    par: 5,
     opt: [['pull', 'AS73', 2], ['pull', 'AS72', 2], ['spot', 'AS75', 4]],
   },
   {
     id: 'p0-2', tier: 0,
     title: 'Add to the cut',
-    hint: 'AS73 already holds a three-car cut sitting deep. Bring the two off AS71 and the one off AS72 onto your engine, then SPOT all three in front of it. Three moves.',
+    hint: 'AS73 already holds a three-car cut sitting deep. Bring the two off AS71 and the one off AS72 onto your engine, then SPOT all three in front of it. Three handlings — par 5.',
     rules: ['line', 'speed', 'couple', 'shove'],
     start: {
       AS73: [260, 'CN 198450', 'CN 198212', 'CN 198330'],
@@ -47,13 +47,13 @@ export const PUZZLES = [
       AS75: [220, ['CEFX 2019', 'autorack'], ['CEFX 2044', 'autorack']],
     },
     goal: { track: 'AS73', cars: ['CN 198450', 'CN 198212', 'CN 198330', 'BNSF 7244', 'CP 388190', 'UTLX 90113'] },
-    par: 6,
+    par: 5,
     opt: [['pull', 'AS71', 2], ['pull', 'AS72', 1], ['spot', 'AS73', 3]],
   },
   {
     id: 'p0-3', tier: 0,
     title: 'Across the ladder',
-    hint: 'Three cars up on AS76, two on AS72 — all five build on AS71. Line each route (the deep switch reverse, the rest normal), gather them, and SPOT. Three moves.',
+    hint: 'Three cars up on AS76, two on AS72 — all five build on AS71. Line each route (the deep switch reverse, the rest normal), gather them, and SPOT. Three handlings — par 5.',
     rules: ['line', 'speed', 'couple', 'shove'],
     start: {
       AS76: [180, 'CN 210044', 'CN 210052', 'CN 210066'],
@@ -61,13 +61,13 @@ export const PUZZLES = [
       AS74: [220, ['TILX 4410', 'tank'], ['TILX 4428', 'tank']],
     },
     goal: { track: 'AS71', cars: ['CN 210044', 'CN 210052', 'CN 210066', 'GATX 55110', 'GATX 55308'] },
-    par: 6,
+    par: 5,
     opt: [['pull', 'AS72', 2], ['pull', 'AS76', 3], ['spot', 'AS71', 5]],
   },
   {
     id: 'p0-4', tier: 0,
     title: 'Make up the train',
-    hint: 'Five cars on three tracks all go to AS74. Gather them onto your engine — fewest trips — then SPOT the whole cut. Four moves.',
+    hint: 'Five cars on three tracks all go to AS74. Gather them onto your engine — fewest trips — then SPOT the whole cut. Four handlings — par 7.',
     rules: ['line', 'speed', 'couple', 'shove'],
     start: {
       AS71: [180, 'BNSF 8801', 'BNSF 8829'],
@@ -76,7 +76,7 @@ export const PUZZLES = [
       AS76: [200, ['ETTX 9001', 'autorack']],
     },
     goal: { track: 'AS74', cars: ['BNSF 8801', 'BNSF 8829', 'CP 77012', 'CP 77040', 'CN 41002'] },
-    par: 8,
+    par: 7,
     opt: [['pull', 'AS75', 1], ['pull', 'AS72', 2], ['pull', 'AS71', 2], ['spot', 'AS74', 5]],
   },
 
@@ -93,7 +93,7 @@ export const PUZZLES = [
       AS76: [200, ['CEFX 4410', 'autorack'], ['CEFX 4428', 'autorack']],
     },
     goal: { track: 'AS75', cars: ['CN 720019', 'CN 720037', 'CN 720055'] },
-    par: 8,
+    par: 7,
     opt: [['pull', 'AS71', 4], ['pull', 'AS73', 1], ['spot', 'AS75', 3], ['spot', 'AS71', 2]],
   },
   {
@@ -107,7 +107,7 @@ export const PUZZLES = [
       AS76: [200, ['UTLX 8810', 'tank'], ['UTLX 8828', 'tank']],
     },
     goal: { track: 'AS74', cars: ['CN 305001', 'CN 305002', 'CN 305003', 'CN 305004'], ordered: true },
-    par: 16,
+    par: 15,
     opt: [['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1]],
   },
   {
@@ -122,7 +122,7 @@ export const PUZZLES = [
       AS71: [200, ['UTLX 7120', 'tank'], ['UTLX 7148', 'tank']],
     },
     goal: { track: 'AS74', cars: ['CN 480012', 'CN 480044', 'CN 480066'] },
-    par: 10,
+    par: 9,
     opt: [['pull', 'AS74', 3], ['pull', 'AS73', 1], ['pull', 'AS72', 2], ['spot', 'AS74', 3], ['spot', 'AS76', 3]],
   },
   {
@@ -137,7 +137,7 @@ export const PUZZLES = [
       AS76: [200, ['CEFX 9001', 'autorack']],
     },
     goal: { track: 'AS75', cars: ['CN 501001', 'CN 501002', 'CN 501003'] },
-    par: 10,
+    par: 9,
     opt: [['pull', 'AS72', 2], ['pull', 'AS71', 1], ['pull', 'AS73', 1], ['spot', 'AS75', 3], ['spot', 'AS72', 1]],
   },
 
@@ -159,7 +159,7 @@ export const PUZZLES = [
       AS76: [180, ['CN 318404', 'autorack'], ['DTTX 5012', 'autorack']],
     },
     goal: { track: 'AS73', cars: ['CN 318044', 'BNSF 5521'] },
-    par: 6,
+    par: 5,
     opt: [['pull', 'AS71', 1], ['pull', 'AS74', 1], ['spot', 'AS73', 2]],
   },
   {
