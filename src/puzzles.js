@@ -40,7 +40,7 @@ export const PUZZLES = [
   {
     id: 'p0-2', tier: 0,
     title: 'Add to the cut',
-    hint: 'AS73 already holds a three-car cut sitting deep. Bring the two off AS71 and the two off AS72 onto your engine, then SPOT all four in front of it — a seven-car cut. Three handlings — par 5.',
+    hint: 'AS73 already holds a three-car cut sitting deep. Bring the two off AS71 and the two off AS72 onto your engine, then SPOT all four ahead of it on AS73. Three handlings — par 5.',
     rules: ['line', 'speed', 'couple', 'shove'],
     start: {
       AS73: [300, 'CN 198450', 'CN 198212', 'CN 198330'],

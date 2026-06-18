@@ -6,7 +6,7 @@
 // lays out and works correctly, a car only moves when pushed, and tracks can hold
 // separated cuts.
 
-import { TRACK_IDS, NTRACK, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType } from './geometry.js';
+import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType } from './geometry.js';
 
 export const lenOf = (state, label) => carLen(state.type[label]);
 export const loadedOf = (state, label) => state.loaded[label] !== false;   // default loaded
@@ -35,7 +35,13 @@ export function freshState(puzzle) {
   for (let i = 0; i < NTRACK; i++) {
     const id = TRACK_IDS[i];
     const L = layout((puzzle.start && puzzle.start[id]) || []);
-    tracks[id] = L.cars; pos[id] = L.pos; Object.assign(type, L.types); Object.assign(loaded, L.loads);
+    tracks[id] = L.cars; Object.assign(type, L.types); Object.assign(loaded, L.loads);
+    // settle the cut DEEP — shove it to the back of the track, throat left open, keeping the
+    // authored gaps between separate cuts (Jordan: cars go near the end if there's room).
+    const trackLen = TRACK_RIGHT - switchPos(i).x;
+    const dEdge = L.cars.length ? L.pos[L.pos.length - 1] + carLen(L.types[L.cars[L.cars.length - 1]]) : 0;
+    const shift = L.cars.length ? Math.max(0, trackLen - dEdge) : 0;
+    pos[id] = L.pos.map((p) => p + shift);
     secured[id] = (puzzle.startSecured && puzzle.startSecured[id]) || tracks[id].length >= 2;
     lined[id] = 'normal';
   }
@@ -69,29 +75,28 @@ export function routeReady(state, id) {
 }
 
 // --- Spot planning (pure, length-aware) -----------------------------------
-// Where your n cars land and how a standing cut shifts. Couple in front if there's
-// room clear of the foul point, else SHOVE the cut deeper just enough (cascading
-// only where it actually contacts cars — separations that aren't touched are kept).
-export function spotPlan(state, id, n) {
+// The cut shoves DEEP: to the end of an empty track, else a car-length GAP short of the
+// throat-most standing cut (left as a SEPARATE cut). KICK couples on (the cars roll in and
+// join the backstop); a SPOT with no room for a gap also couples rather than crowd the foul
+// point. The standing cut never moves — the new cut takes the room ahead of it.
+const GAP = CARLEN;                                  // a car-length gap separates distinct cuts
+export function spotPlan(state, id, n, couple = false) {
+  const trackLen = TRACK_RIGHT - switchPos(TRACK_IDS.indexOf(id)).x;
   const P = state.pos[id], T = state.tracks[id];
-  const yourCars = state.engine.slice(state.engine.length - n);
-  const yourLens = yourCars.map((c) => lenOf(state, c));
+  const yourLens = state.engine.slice(state.engine.length - n).map((c) => lenOf(state, c));
   const yourTotal = yourLens.reduce((a, b) => a + b, 0);
   const placeYour = (nearEdge) => { const out = []; let c = nearEdge; for (const L of yourLens) { out.push(c); c += L; } return out; };
-  const standingDeepEdge = (posArr) => (T.length ? posArr[T.length - 1] + lenOf(state, T[T.length - 1]) : 0);
+  const standingDeepEdge = T.length ? P[T.length - 1] + lenOf(state, T[T.length - 1]) : 0;
 
+  let deepEdge;
   if (T.length === 0) {
-    const yourPos = placeYour(SPOT_CLEAR);
-    return { yourPos, newStanding: [], shove: false, deepEdge: SPOT_CLEAR + yourTotal };
+    deepEdge = trackLen;                             // empty — shove to the very end
+  } else {
+    const p0 = P[0];                                 // throat-most standing car's near edge
+    deepEdge = (couple || p0 - GAP - yourTotal < CLEAR) ? p0 : p0 - GAP;
   }
-  const p0 = P[0];
-  if (p0 - yourTotal >= CLEAR) {                       // room in front — cut stays put
-    return { yourPos: placeYour(p0 - yourTotal), newStanding: P.slice(), shove: false, deepEdge: standingDeepEdge(P) };
-  }
-  const yourPos = placeYour(SPOT_CLEAR);               // shove the cut back
-  const newStanding = []; let prevFar = SPOT_CLEAR + yourTotal;
-  for (let k = 0; k < T.length; k++) { const np = Math.max(P[k], prevFar); newStanding.push(np); prevFar = np + lenOf(state, T[k]); }
-  return { yourPos, newStanding, shove: true, deepEdge: standingDeepEdge(newStanding) };
+  const nearEdge = deepEdge - yourTotal;
+  return { yourPos: placeYour(nearEdge), newStanding: P.slice(), shove: false, deepEdge: Math.max(deepEdge, standingDeepEdge), nearEdge };
 }
 
 // --- Validators (no mutation) ---------------------------------------------
@@ -114,8 +119,8 @@ export function canSpot(state, id, n) {
   if (n < 1) return { ok: false, msg: 'Spot at least one car.' };
   if (n > have) return { ok: false, msg: `You're only holding ${have} car${have === 1 ? '' : 's'}.` };
   const plan = spotPlan(state, id, n);
-  if (switchPos(TRACK_IDS.indexOf(id)).x + plan.deepEdge > TRACK_RIGHT)
-    return { ok: false, msg: `${id} is too full to take ${n} more — no room to shove the cut back (CROR 114).` };
+  if (plan.nearEdge < CLEAR)
+    return { ok: false, msg: `${id} is too full — no room to spot ${n} more clear of the foul point (CROR 114).` };
   return { ok: true, msg: '' };
 }
 
@@ -169,8 +174,8 @@ export function canKick(state, id, n) {
     return { ok: false, msg: `Too many LOADED cars in one kick — at most ${state.kickLimit.loaded} loaded (special instruction).` };
   if (!loadedOf(state, state.tracks[id][0]) && kicked.some((c) => loadedOf(state, c)))
     return { ok: false, msg: `Don't kick a loaded car onto an empty cut — ${id}'s standing car is empty (special instruction).` };
-  const plan = spotPlan(state, id, n);
-  if (switchPos(TRACK_IDS.indexOf(id)).x + plan.deepEdge > TRACK_RIGHT)
+  const plan = spotPlan(state, id, n, true);
+  if (plan.nearEdge < CLEAR)
     return { ok: false, msg: `${id} is too full to take ${n} more.` };
   return { ok: true, msg: '' };
 }
@@ -178,7 +183,7 @@ export function canKick(state, id, n) {
 export function kick(state, id, n) {
   const v = canKick(state, id, n);
   if (!v.ok) return refuse(state, v.msg);
-  const plan = spotPlan(state, id, n);
+  const plan = spotPlan(state, id, n, true);
   const taken = state.engine.splice(state.engine.length - n, n);
   state.tracks[id] = taken.concat(state.tracks[id]);
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
