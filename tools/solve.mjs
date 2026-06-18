@@ -8,6 +8,8 @@
 
 import { solve, replay } from '../src/solver.js';
 import { PUZZLES } from '../src/puzzles.js';
+import { freshState, pull, canKick } from '../src/model.js';
+import { TRACK_IDS } from '../src/geometry.js';
 
 const PRINT = process.argv.includes('--print');
 let fail = 0;
@@ -35,5 +37,23 @@ for (const p of PUZZLES) {
   }
 }
 
-console.log(fail ? `\n${fail} puzzle(s) FAILED ❌\n` : `\nAll ${PUZZLES.length} puzzles verified ✓\n`);
+// --- kick rules proven as law (negative + positive tests) -----------------
+const aLine = (s, id) => { for (const t of TRACK_IDS) s.lined[t] = t === id ? 'reverse' : 'normal'; };
+const refused = (label, fn) => { const r = fn(); const ok = !r.ok; console.log(`  ${ok ? '✓' : '✗'} kick-law: ${label} — ${ok ? 'refused: ' + r.msg.slice(0, 56) : 'WAS ALLOWED (should refuse)'}`); if (!ok) fail++; };
+const allowed = (label, fn) => { const r = fn(); console.log(`  ${r.ok ? '✓' : '✗'} kick-law: ${label} — ${r.ok ? 'allowed' : 'refused (should allow): ' + r.msg}`); if (!r.ok) fail++; };
+
+console.log('kick rules (proven as law):');
+const kp = {
+  kickable: ['AS73', 'AS72'],
+  start: { AS73: [200, 'A', 'B'], AS72: [200, 'C'], AS71: [140, 'X', 'Y'], AS75: [140, ['T1', 'tank'], ['T2', 'tank']] },
+  goal: { track: 'AS73', cars: ['A', 'B'] },
+};
+const sBox = freshState(kp); aLine(sBox, 'AS71'); pull(sBox, 'AS71', 2);   // hold 2 box cars
+refused('kick onto a non-kickable track (AS75)', () => { aLine(sBox, 'AS75'); return canKick(sBox, 'AS75', 2); });
+refused('kick onto an unsecured / short cut (AS72)', () => { aLine(sBox, 'AS72'); return canKick(sBox, 'AS72', 2); });
+allowed('kick box cars onto a secured kickable cut (AS73)', () => { aLine(sBox, 'AS73'); return canKick(sBox, 'AS73', 2); });
+const sTank = freshState(kp); aLine(sTank, 'AS75'); pull(sTank, 'AS75', 2);  // hold 2 tank cars
+refused('kick TANK cars (not kickable type)', () => { aLine(sTank, 'AS73'); return canKick(sTank, 'AS73', 2); });
+
+console.log(fail ? `\n${fail} check(s) FAILED ❌\n` : `\nAll ${PUZZLES.length} puzzles + kick rules verified ✓\n`);
 process.exit(fail ? 1 : 0);

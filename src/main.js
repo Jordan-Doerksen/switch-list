@@ -3,7 +3,7 @@
 // Command-and-watch: you line the road and call the move; the engine works it.
 
 import { W, H, NTRACK, TRACK_IDS, switchPos, engineRoute, ENGLEN, restS, carLen } from './geometry.js';
-import { freshState, lineSwitch, canPull, canSpot, spotPlan, pull, spot, checkWin, grade } from './model.js';
+import { freshState, lineSwitch, canPull, canSpot, canKick, spotPlan, pull, spot, kick, checkWin, grade } from './model.js';
 import { render } from './render.js';
 import { play, setSpeed } from './anim.js';
 import { sfx, resume, toggleMute, isMuted } from './sound.js';
@@ -56,7 +56,7 @@ $('mute').addEventListener('click', () => { $('mute').textContent = toggleMute()
 // Full validation up front (lining + count + foul/clearance) so a fouling move is
 // refused before the engine ever moves.
 function precheck(kind, id, n) {
-  return kind === 'pull' ? canPull(state, id, n) : canSpot(state, id, n);
+  return kind === 'pull' ? canPull(state, id, n) : kind === 'kick' ? canKick(state, id, n) : canSpot(state, id, n);
 }
 
 function animateMove(kind, id, n) {
@@ -100,10 +100,10 @@ function animateMove(kind, id, n) {
           if (!committed) {
             committed = true;
             const onto = kind === 'spot' && state.tracks[id].length > 0;
-            (kind === 'pull' ? pull : spot)(state, id, n);
-            if (kind === 'pull' || onto) sfx.couple(); else sfx.roll();
+            (kind === 'pull' ? pull : kind === 'kick' ? kick : spot)(state, id, n);
+            if (kind === 'kick') sfx.roll(); else if (kind === 'pull' || onto) sfx.couple(); else sfx.roll();
             cut = state.engine.slice();    // what it carries on the way out
-            restEnd = restS(state.engine.length * CARLEN);
+            restEnd = restS(state.engine.reduce((a, c) => a + carLen(state.type[c]), 0));
           }
           anim = { route, engS: lerp(engIn, restEnd, t), cut, shove: null };
         },

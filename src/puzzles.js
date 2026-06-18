@@ -12,6 +12,9 @@ export const RULES = {
   couple: { kind: 'cror', cite: 'CROR 113.0 / 113.2', label: 'Couple, then stretch to verify the joint' },
   shove:  { kind: 'cror', cite: 'CROR 115',          label: 'Shove only with the route lined & protected' },
   verify: { kind: 'si',   cite: 'Switch list',        label: 'Verify cars by their markings — the list can be wrong' },
+  secure: { kind: 'cror', cite: 'CROR 112',           label: 'A standing cut of 2+ cars is tied down (secured)' },
+  kick:   { kind: 'cror', cite: 'CROR 113.4 / 113.5', label: 'Kick only onto a secured cut; not every car can be kicked' },
+  kickable: { kind: 'si', cite: 'Kickable tracks',    label: 'Kick only where the special instruction allows (⚡)' },
 };
 
 export const PUZZLES = [
@@ -106,5 +109,22 @@ export const PUZZLES = [
     goal: { track: 'AS73', cars: ['CN 318044', 'BNSF 5521'] },
     par: 3,
     opt: [['pull', 'AS71', 1], ['pull', 'AS74', 1], ['spot', 'AS73', 2]],
+  },
+  {
+    id: 'p2-kick', tier: 2,
+    title: 'Kick it on clean',
+    hint: 'AS73 already holds a tied-down cut, and it is a kickable track (⚡). Bring the two box cars off AS71 and KICK them onto the cut — a kick makes no coupling, so it is the clean way to do it. (The tankers and autoracks on the other tracks can NOT be kicked.)',
+    rules: ['kickable', 'secure', 'kick', 'line', 'speed', 'couple', 'shove'],
+    kickable: ['AS73'],
+    start: {
+      AS73: [200, 'CN 445010', 'CN 445028'],                         // secured 2-car cut (kickable track)
+      AS71: [140, 'CN 661012', 'CN 661140'],                         // your two box cars
+      AS72: [260, ['UTLX 70210', 'tank'], ['GATX 4408', 'tank']],    // can't be kicked
+      AS75: [220, ['ETTX 90120', 'autorack'], ['BNSF 5012', 'autorack']], // can't be kicked
+      AS76: [180, ['CN 33120', 'hopper'], ['CN 33148', 'hopper']],
+    },
+    goal: { track: 'AS73', cars: ['CN 445010', 'CN 445028', 'CN 661012', 'CN 661140'] },
+    par: 2,
+    opt: [['pull', 'AS71', 2], ['kick', 'AS73', 2]],
   },
 ];

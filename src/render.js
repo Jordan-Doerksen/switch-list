@@ -22,8 +22,8 @@ export function render(ctx, state, puzzle, opts = {}) {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
 
-  // securing (CROR 112) is gated by the rule ramp — only surface "TIED" once it's active
-  const showSecured = !!(puzzle.rules && puzzle.rules.includes('secure'));
+  // securing (CROR 112) surfaces once securing/kicking is active in the puzzle
+  const showSecured = !!(puzzle.rules && (puzzle.rules.includes('secure') || puzzle.rules.includes('kick')));
 
   drawRoutes(ctx);
   for (let i = 0; i < NTRACK; i++) drawClearTick(ctx, i);
@@ -99,9 +99,11 @@ function drawClearTick(ctx, i) {
 
 function drawTrackLabels(ctx, state, showSecured) {
   for (let i = 0; i < NTRACK; i++) {
-    const y = trackY(i), tied = showSecured && state.secured[TRACK_IDS[i]];
-    tag(ctx, TRACK_IDS[i], TRACK_RIGHT + 10, y, 'left', C.label, '700 13px ui-monospace, monospace');
-    if (tied) tag(ctx, 'TIED', TRACK_RIGHT + 10, y + 16, 'left', C.reverse, '700 10px ui-monospace, monospace');
+    const id = TRACK_IDS[i], y = trackY(i);
+    tag(ctx, id, TRACK_RIGHT + 10, y, 'left', C.label, '700 13px ui-monospace, monospace');
+    let sub = y + 16;
+    if (showSecured && state.secured[id]) { tag(ctx, 'TIED', TRACK_RIGHT + 10, sub, 'left', C.reverse, '700 10px ui-monospace, monospace'); sub += 13; }
+    if (state.kickable && state.kickable.includes(id)) tag(ctx, '⚡ KICKABLE', TRACK_RIGHT + 10, sub, 'left', C.reverse, '700 9px ui-monospace, monospace');
   }
 }
 

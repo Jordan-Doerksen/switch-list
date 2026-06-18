@@ -3,13 +3,13 @@
 // Dijkstra over states, cost = (moves, then joints). It applies the REAL engine
 // moves, so solver and game can never disagree. Lining is auto-satisfied per move.
 
-import { freshState, pull, spot, checkWin } from './model.js';
+import { freshState, pull, spot, kick, checkWin } from './model.js';
 import { TRACK_IDS } from './geometry.js';
 
 function clone(s) {
   const tracks = {}, pos = {}, secured = {}, lined = {};
   for (const t of TRACK_IDS) { tracks[t] = s.tracks[t].slice(); pos[t] = s.pos[t].slice(); secured[t] = s.secured[t]; lined[t] = s.lined[t]; }
-  return { tracks, pos, type: s.type, engine: s.engine.slice(), secured, lined, moves: s.moves, joints: s.joints, msg: '', won: s.won };
+  return { tracks, pos, type: s.type, kickable: s.kickable, engine: s.engine.slice(), secured, lined, moves: s.moves, joints: s.joints, msg: '', won: s.won };
 }
 function autoLine(s, id) { for (const t of TRACK_IDS) s.lined[t] = (t === id) ? 'reverse' : 'normal'; }
 function key(s) { return TRACK_IDS.map((t) => s.tracks[t].join(',') + '@' + s.pos[t].join(',')).join(';') + '#' + s.engine.join(','); }
@@ -56,12 +56,16 @@ export function solve(puzzle, { maxMoves = 10, maxStates = 120000 } = {}) {
       if (D === goalTrack || stashing)
         for (let n = 1; n <= cur.s.engine.length; n++) step(cur, 'spot', D, n, h, best);
     }
+    // KICK onto the goal (when kickable + secured + kickable types) — same moves as
+    // a spot but 0 joints, so the solver picks it for the cleaner line.
+    for (let n = 1; n <= cur.s.engine.length; n++) step(cur, 'kick', goalTrack, n, h, best);
   }
   return null;
 }
+const MOVE_FN = { pull, spot, kick };
 function step(cur, act, T, n, h, best) {
   const s = clone(cur.s); autoLine(s, T);
-  if (!(act === 'pull' ? pull : spot)(s, T, n).ok) return;
+  if (!MOVE_FN[act](s, T, n).ok) return;
   const k = key(s), c = [s.moves, s.joints], b = best.get(k);
   if (!b || c[0] < b[0] || (c[0] === b[0] && c[1] < b[1])) { best.set(k, c); h.push({ s, path: cur.path.concat([[act, T, n]]) }); }
 }
@@ -71,7 +75,7 @@ export function replay(puzzle, line) {
   const s = freshState(puzzle);
   for (const [act, T, n] of line) {
     autoLine(s, T);
-    const r = (act === 'pull' ? pull : spot)(s, T, n);
+    const r = MOVE_FN[act](s, T, n);
     if (!r.ok) return { ok: false, where: `${act} ${T} ${n}`, msg: r.msg };
   }
   return { ok: checkWin(s, puzzle), moves: s.moves, joints: s.joints };

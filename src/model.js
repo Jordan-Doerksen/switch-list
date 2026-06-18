@@ -6,7 +6,7 @@
 // lays out and works correctly, a car only moves when pushed, and tracks can hold
 // separated cuts.
 
-import { TRACK_IDS, NTRACK, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen } from './geometry.js';
+import { TRACK_IDS, NTRACK, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType } from './geometry.js';
 
 export const lenOf = (state, label) => carLen(state.type[label]);
 
@@ -37,7 +37,9 @@ export function freshState(puzzle) {
     secured[id] = (puzzle.startSecured && puzzle.startSecured[id]) || tracks[id].length >= 2;
     lined[id] = 'normal';
   }
-  return { tracks, pos, type, engine: [], secured, lined, moves: 0, joints: 0, msg: '', won: false };
+  // kickable tracks are a SPECIAL INSTRUCTION, declared per puzzle (may be none).
+  const kickable = puzzle.kickable ? puzzle.kickable.slice() : [];
+  return { tracks, pos, type, engine: [], secured, lined, kickable, moves: 0, joints: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -130,6 +132,40 @@ export function spot(state, id, n) {
   if (onto) state.joints += 1;
   if (state.tracks[id].length >= 2) state.secured[id] = true;
   return commit(state, `Spotted ${n} to ${id}.`);
+}
+
+// KICK n to T — shove and cut away; the cars coast onto a SECURED standing 2+ cut on
+// a KICKABLE track. Same landing physics as SPOT but 0 joints (the efficiency win).
+// Legal only where the rules allow it (CROR 113.4/113.5 + the yard's special instruction).
+export function canKick(state, id, n) {
+  const r = routeReady(state, id);
+  if (!r.ok) return r;
+  const have = state.engine.length;
+  if (n < 1) return { ok: false, msg: 'Kick at least one car.' };
+  if (n > have) return { ok: false, msg: `You're only holding ${have} car${have === 1 ? '' : 's'}.` };
+  if (!state.kickable.includes(id))
+    return { ok: false, msg: `${id} isn't a kickable track here — kicking is only allowed where the special instruction says (CROR 113.4).` };
+  if (state.tracks[id].length < 2 || !state.secured[id])
+    return { ok: false, msg: `You can only kick onto a secured standing cut of 2+ cars — ${id} isn't tied down (CROR 113.4/113.5).` };
+  const bad = state.engine.slice(state.engine.length - n).find((c) => !kickableType(state.type[c]));
+  if (bad)
+    return { ok: false, msg: `${bad} can't be kicked — that car type isn't kicked here (CROR 113.4 + special instruction).` };
+  const plan = spotPlan(state, id, n);
+  if (switchPos(TRACK_IDS.indexOf(id)).x + plan.deepEdge > TRACK_RIGHT)
+    return { ok: false, msg: `${id} is too full to take ${n} more.` };
+  return { ok: true, msg: '' };
+}
+
+export function kick(state, id, n) {
+  const v = canKick(state, id, n);
+  if (!v.ok) return refuse(state, v.msg);
+  const plan = spotPlan(state, id, n);
+  const taken = state.engine.splice(state.engine.length - n, n);
+  state.tracks[id] = taken.concat(state.tracks[id]);
+  state.pos[id] = plan.yourPos.concat(plan.newStanding);
+  // no joint — the kicked cars coast on by themselves (that's the win vs spotting)
+  state.secured[id] = true;                            // still a standing 2+ cut
+  return commit(state, `Kicked ${n} to ${id}.`);
 }
 
 function refuse(state, msg) { state.msg = msg; return { ok: false, msg }; }

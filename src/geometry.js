@@ -36,14 +36,17 @@ export const TRACK_HEAD = 44;            // default gap switch → throat car (C
 export const SPOT_CLEAR = 44;            // where a fresh spot lands on an empty track (≥ CLEAR)
 export const LEAD_REST = 120;            // engine's resting x on the lead (empty)
 
+// kick: may this type be kicked? box/hopper yes; tank/autorack/centerbeam NO
+// (Jordan's SME call — high COG / dangerous goods / long loads aren't kicked).
 export const TYPES = {
-  box:        { len: 42, fill: '#aeb6c0', edge: '#5b636e', tag: 'BX' },   // ~50 ft
-  hopper:     { len: 47, fill: '#9fb6a2', edge: '#5a6b5d', tag: 'HP' },   // ~56 ft covered hopper
-  tank:       { len: 50, fill: '#b3a7c4', edge: '#665d77', tag: 'TK' },   // ~60 ft tank car
-  centerbeam: { len: 61, fill: '#c6b88c', edge: '#6f6543', tag: 'CB' },   // ~73 ft lumber/centerbeam
-  autorack:   { len: 75, fill: '#9fb4c6', edge: '#566875', tag: 'AR' },   // ~89 ft autorack / car carrier
+  box:        { len: 42, fill: '#aeb6c0', edge: '#5b636e', tag: 'BX', kick: true },   // ~50 ft
+  hopper:     { len: 47, fill: '#9fb6a2', edge: '#5a6b5d', tag: 'HP', kick: true },   // ~56 ft covered hopper
+  tank:       { len: 50, fill: '#b3a7c4', edge: '#665d77', tag: 'TK', kick: false },  // ~60 ft tank car
+  centerbeam: { len: 61, fill: '#c6b88c', edge: '#6f6543', tag: 'CB', kick: false },  // ~73 ft lumber/centerbeam
+  autorack:   { len: 75, fill: '#9fb4c6', edge: '#566875', tag: 'AR', kick: false },  // ~89 ft autorack / car carrier
 };
 export const carLen = (type) => (TYPES[type] || TYPES.box).len;
+export const kickableType = (type) => (TYPES[type] || TYPES.box).kick !== false;
 
 // Lead arclength landmarks (the lead is the first segment of every engine route).
 export const S_FOOT = Math.abs(FOOT.x - LEAD_LEFT);   // arclength lead-left → ladder foot
