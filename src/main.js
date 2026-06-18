@@ -17,35 +17,49 @@ canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
 let puzzle, state, anim = null, busy = false, watching = false;
 let ordered = true;                 // is the switch list verified? (true when there's no list to check)
 const flagged = new Set();          // indices the player has flagged as wrong
-let introS = null;                  // inbound road train's arclength during the arrival cinematic
+let cine = null, cineCancel = null, cineTimer = null;   // inbound-arrival cinematic state
 
 const $ = (id) => document.getElementById(id);
 
+function cancelCine() {
+  if (cineCancel) cineCancel();
+  if (cineTimer) clearTimeout(cineTimer);
+  cineCancel = cineTimer = null; cine = null;
+}
+
 function load(p) {
-  puzzle = p; state = freshState(p); anim = null; introS = null; busy = false; watching = false; setSpeed(1);
+  cancelCine();
+  puzzle = p; state = freshState(p); anim = null; busy = false; watching = false; setSpeed(1);
   ordered = !p.listed; flagged.clear();
   const dep = $('depart'); dep.style.display = p.goal.depart ? '' : 'none'; dep.disabled = true;
   renderRules(); renderOrder(); syncBuilder(); paint(); banner('', '');
   $('readout').textContent = `Moves 0 / par ${p.par} · Joints 0`;
-  arrivalCinematic();               // flavor: the road train sets out + runs through
+  arrivalCinematic();
 }
 
-function paint() { render(ctx, state, puzzle, { anim, intro: introS }); }
+function paint() { render(ctx, state, puzzle, { anim, cine }); }
 
-// Inbound road train sweeps the through route (off top-right → down the ladder → out
-// the lead). Non-blocking flavor; self-clears even if rAF is throttled.
+// Inbound road train (only on `inbound` puzzles): in off the main, STOP, set out a
+// few cars onto the set-out track, then DEPART out the lead — your power is off-scene
+// the whole time. Self-finishes even if rAF is throttled, so the puzzle always
+// becomes playable (the cars are already on the track in the model).
 function arrivalCinematic() {
-  if (!puzzle.goal.depart) { introS = null; return; }
-  const len = routeLength(THROUGH_ROUTE);
-  let finished = false;
-  const finish = () => { if (finished) return; finished = true; introS = null; paint(); };
-  play([{ dur: 2600, fn: (t) => { introS = -220 + (len + 460) * t; } }], { onFrame: paint, onDone: finish });
-  setTimeout(finish, 3600);
+  cancelCine();
+  if (!puzzle.inbound) { paint(); return; }
+  const lenR = routeLength(THROUGH_ROUTE), stopS = lenR - 110;
+  cine = { introS: -220, setoutCars: puzzle.inbound.cars, to: puzzle.inbound.to, delivered: false };
+  const finish = () => { cancelCine(); paint(); };
+  cineCancel = play([
+    { dur: 2200, fn: (t) => { if (cine) cine.introS = -220 + (stopS + 220) * t; } },              // arrive & stop
+    { dur: 700, fn: () => { if (cine) cine.delivered = true; } },                                 // set out (cars drop to the track)
+    { dur: 1700, fn: (t) => { if (cine) cine.introS = stopS + (lenR + 420 - stopS) * t; } },      // depart out the lead
+  ], { onFrame: paint, onDone: finish });
+  cineTimer = setTimeout(finish, 5500);
 }
 
 // --- input: line a switch by clicking its target -------------------------
 canvas.addEventListener('click', (e) => {
-  if (busy) return;
+  if (busy || cine) return;
   resume();
   const r = canvas.getBoundingClientRect();
   const x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
@@ -128,7 +142,7 @@ function animateMove(kind, id, n) {
 }
 
 function doMove(kind, id, n) {
-  if (busy) return;
+  if (busy || cine) return;
   if (!ordered) { sfx.refuse(); banner('Verify the switch list first — flag the bad lines and certify the order.', 'bad'); return; }
   const chk = precheck(kind, id, n);
   if (!chk.ok) { sfx.refuse(); banner(chk.msg, 'bad'); return; }
@@ -142,8 +156,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ▶ Watch optimal — reset, then auto-line + play the fewest-moves line in slow-mo.
 async function watchOptimal() {
-  if (busy || !puzzle.opt) return;
+  if (busy || cine || !puzzle.opt) return;
   load(puzzle);
+  cancelCine();                      // skip the arrival cinematic for the demo
   if (!ordered) {                                   // auto-certify the list for the demo
     puzzle.listed.forEach((e, i) => { if (e.error) flagged.add(i); });
     ordered = true; renderOrder();

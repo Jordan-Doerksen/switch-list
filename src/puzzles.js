@@ -151,6 +151,7 @@ export const PUZZLES = [
     title: 'Build the outbound & depart',
     hint: 'A road train set out CN 401002 & 401003 on AS73. Build your outbound in MANIFEST ORDER — CN 401001 (head), then 401002, then 401003 — so pick them up in that order onto your train. It stays coupled to you; don’t set it back down — just call Depart ▸ to leave out the lead.',
     rules: ['order', 'line', 'speed', 'couple', 'shove'],
+    inbound: { cars: ['CN 401002', 'CN 401003'], to: 'AS73' },    // road train sets these out before you start
     start: {
       AS72: [180, 'CN 401001'],                                   // your head-end car
       AS73: [200, 'CN 401002', 'CN 401003'],                      // set out by the inbound (a block)

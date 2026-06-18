@@ -30,31 +30,34 @@ export function render(ctx, state, puzzle, opts = {}) {
   for (let i = 0; i < NTRACK; i++) drawSwitch(ctx, i, state.lined[TRACK_IDS[i]]);
   drawTrackLabels(ctx, state, showSecured);
 
-  // standing cars (a cut being shoved deeper by a spot animates via opts.anim.shove)
+  // standing cars. During the inbound cinematic, the not-yet-delivered set-out cars
+  // ride on the inbound train, so hide them from their track until delivered.
+  const cine = opts.cine || null;
   const shove = opts.anim ? opts.anim.shove : null;
-  for (let i = 0; i < NTRACK; i++) drawStandingCars(ctx, state, i, shove);
+  const hide = cine && !cine.delivered ? new Set(cine.setoutCars) : null;
+  for (let i = 0; i < NTRACK; i++) drawStandingCars(ctx, state, i, shove, hide);
 
-  // the engine + its cut: animated train if a move is playing, else at rest
-  // (backed off far enough that the held cut stays clear of the ladder foul point)
-  const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
-  if (opts.anim) drawTrain(ctx, opts.anim.route, opts.anim.engS, opts.anim.cut, state);
-  else drawTrain(ctx, LEAD_ROUTE, restS(cutLen), state.engine, state);
-
-  if (opts.intro != null) drawIntroTrain(ctx, opts.intro);   // inbound road train (cinematic)
+  if (cine) {
+    drawInboundTrain(ctx, state, cine);                       // road train working; player power is off-scene
+  } else {
+    // the engine + its cut: animated train if a move is playing, else at rest
+    const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
+    if (opts.anim) drawTrain(ctx, opts.anim.route, opts.anim.engS, opts.anim.cut, state);
+    else drawTrain(ctx, LEAD_ROUTE, restS(cutLen), state.engine, state);
+  }
 }
 
-// A generic road train (loco + a few cars) sweeping the through route — flavor for
-// the inbound set-out / run-through. Trails behind the loco (toward the main).
-function drawIntroTrain(ctx, engS) {
-  const L = 42;
-  const loco = polyAt(THROUGH_ROUTE, engS);
+// The inbound road train (loco + ~12 cars) on the through route, for the arrival
+// cinematic. Carries the real set-out cars until they're delivered to the track.
+function drawInboundTrain(ctx, state, cine) {
+  const loco = polyAt(THROUGH_ROUTE, cine.introS);
   carRect(ctx, loco.x, loco.y, loco.angle, ENGLEN, null, 'loco');
-  let s = engS - ENGLEN / 2;
-  for (let k = 0; k < 5; k++) {
-    const p = polyAt(THROUGH_ROUTE, s - L / 2);
-    carRect(ctx, p.x, p.y, p.angle, L, null, 'car', k % 2 ? 'hopper' : 'box');
-    s -= L;
-  }
+  const cars = [];
+  for (let k = 0; k < 6; k++) cars.push({ len: 42, type: k % 2 ? 'hopper' : 'box' });
+  if (!cine.delivered) for (const m of cine.setoutCars) cars.push({ len: carLen(state.type[m]), type: state.type[m], loaded: state.loaded[m], mark: m });
+  for (let k = 0; k < 5; k++) cars.push({ len: 42, type: k % 2 ? 'box' : 'hopper' });
+  let s = cine.introS - ENGLEN / 2;
+  for (const c of cars) { const p = polyAt(THROUGH_ROUTE, s - c.len / 2); carRect(ctx, p.x, p.y, p.angle, c.len, c.mark || null, 'car', c.type, c.loaded); s -= c.len; }
 }
 
 function drawRoutes(ctx) {
@@ -158,12 +161,13 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 
-function drawStandingCars(ctx, state, i, shove) {
+function drawStandingCars(ctx, state, i, shove, hide) {
   const id = TRACK_IDS[i];
   const cars = state.tracks[id], P = state.pos[id];
   const sx = switchPos(i).x, y = trackY(i);
   const shoving = shove && shove.id === id;                // this cut is being pushed
   for (let k = 0; k < cars.length; k++) {
+    if (hide && hide.has(cars[k])) continue;               // still on the inbound — not yet set out
     const nearEdge = shoving ? shove.from[k] + (shove.to[k] - shove.from[k]) * shove.prog : P[k];
     const w = carLen(state.type[cars[k]]);
     carRect(ctx, sx + nearEdge + w / 2, y, 0, w, cars[k], 'car', state.type[cars[k]], state.loaded[cars[k]]);
