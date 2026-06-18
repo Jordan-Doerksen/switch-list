@@ -5,6 +5,8 @@
 > Home repo: **`switch-list`** (`C:\projects\switch-list`) — these docs live there under `/docs`.
 > Rules source of truth: the **`cn-conductor-trainer`** repo (the Jan 2025 CROR PDF + the signal data).
 
+> **Progress (as built, 2026‑06‑18):** P0 vertical slice is playable & verified — `index.html` + `src/{geometry,model,render,anim,sound,puzzles,main}.js` + `tools/solve.mjs` (move‑first solver/harness). The concrete as‑built model, rules, and constants live in **SPEC §9, §12, §13** (per‑car positions; cars only move when pushed; spot shove‑back; foul refused before animating; full/varied/deep yards; the instinct curriculum). Done: foul enforcement, no car‑jump, no overlap, labels, shove‑back, solver. Next: P1/P2 tiers + randomization (#5), scatter generator (#6), switch‑list‑error mechanic (#7).
+
 ---
 
 ## What you’re building

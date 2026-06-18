@@ -14,3 +14,10 @@ Thumbs.db
 *.log
 tmp/
 .tmp/
+
+# reference source material — NO-REDISTRIBUTE, local-only.
+# The CROR rulebook, CN Grande Prairie yard map, and third-party study aids are
+# copyright their owners and must not be published. The committed .md digests
+# (citation-index.md, crtc-fundamentals-notes.md) carry the value instead.
+docs/*.pdf
+docs/gp-yard-large.jpg

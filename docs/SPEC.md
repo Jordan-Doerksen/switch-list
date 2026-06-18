@@ -168,46 +168,58 @@ Always present in the chrome (cite, don’t quiz): **yard speed 15 MPH / Reduced
 
 Single‑file (or small) vanilla‑JS + Canvas 2D. No framework, no build step (GitHub Pages friendly). Web Audio for sound (no asset files).
 
-### State
+### State  *(as built 2026‑06‑18 — per‑car positions)*
 ```
 state = {
   tracks: { AS71:[label,…], … },   // throat→deep order
-  engine: [label,…],               // last = working/coupler end
+  pos:    { AS71:[px,…],   … },     // PARALLEL to tracks: each car's near‑edge offset
+                                    //   from the switch. Lets a track hold SEPARATED
+                                    //   cuts (gaps), and a car only moves when pushed.
+  engine: [label,…],               // cars held with the loco; [0] = nearest loco
   secured:{ AS71:bool, … },         // a 2+ cut left standing is tied (112)
-  head:   { AS71:px, … },           // distance from the junction to the throat car's near edge
-  loaded: { label:bool },           // load state per car
+  lined:  { AS71:'normal'|'reverse', … },
+  moves, joints, msg, won,
+  // loaded:{label:bool} added at the loads tier (P4)
 }
-carLen(label)  // px from a type map: standard / lumber / autorack
 ```
-Positions are derived: track car *k* centre = `junction + head + Σlen(0..k-1) + len(k)/2`; engine car *q* centre = `engS + ENGLEN/2 + Σlen(0..q-1) + len(q)/2`.
+**Why per‑car `pos` (not a single `head`):** the earlier single‑gap model re‑laid every car from the throat each move, so cars *teleported* and you couldn't leave separations. With explicit positions a car moves **only when physically pulled or pushed** — PULL leaves the rest exactly where they sat; SPOT shoves only the cut it actually contacts. Track car *k* near‑edge = `switchX + pos[id][k]`; engine car *q* centre = `engS + ENGLEN/2 + Σlen(0..q-1) + len(q)/2` along the engine route.
 
 ### Puzzle schema
 ```
 {
   tier, title, hint,
   rules: ['line','pull','spot','kick','foul','loads','length','depart'],  // which rules are active
-  start:  { AS73:['A','B'], … },          // pre-placed yard cars (your held consist + strays)
-  loads:  ['A','B','C'],                  // which cars are loaded (deterministic); omit ⇒ all loaded (tier 0) or random
-  inbound:{ cars:['C','D'], length:20, to:'AS74' },  // optional road set-out
+  start:  { AS73:[200,'A','B'], … },      // LAYOUT DSL: strings = cars (throat→deep),
+                                          //   numbers = gaps in px. A leading number =
+                                          //   how far off the switch the first car sits.
+                                          //   [200,'A','B'] = a cut sitting deep;
+                                          //   [60,'A',90,'B'] = a car, a 90px gap, a car
+                                          //   (two separated cuts). Use it to place cuts
+                                          //   DEEP and varied — never stacked at the throat.
+  loads:  ['A','B','C'],                  // which cars are loaded (P4); omit ⇒ all loaded
+  inbound:{ cars:['C','D'], length:20, to:'AS74' },  // optional road set-out (P6)
   goal:   { track:'AS73', cars:[…], ordered?:true, depart?:true },
-  par:    <min MOVES>,                    // computed by the solver
+  par:    <min MOVES>,                    // VERIFIED by the solver (see below)
   opt:    [['pull','AS74',2], …],         // the min-move (then min-joint) line, for "Watch optimal"
 }
 ```
-`KICKABLE = {AS72:1, AS73:1}` (special instruction).
+`KICKABLE` is a **special instruction**, declared **per puzzle** (a puzzle may shuffle it or have none) — see §11.1.
 
-### Moves (pure functions on state)
-`pull(T,n)`, `spot(T,n)`, `kick(T,n)` — each validates (lining, clearance/foul, lead length, kick legality + load limits) then mutates `tracks/engine/secured/head`. Securing: spotting a 2+ cut sets `secured`; pulling clears it. Joint cost per §5.
+### Moves (operate on state)
+`pull(T,n)`, `spot(T,n)`, `kick(T,n)` (kick = P2). Each is guarded by a **validator** (`canPull`/`canSpot`) that runs in `precheck` **before any animation**, so an illegal/fouling move is refused up front with a cited reason (the engineer protects the move — it never animates then fails).
+- **PULL n:** couple the throat cut, pull n onto the lead. The cars left behind **keep their exact `pos`**. Refused if the cut won't clear the lead (lead foul, CROR 114 — the lead dead‑ends, can't shove back; cap = `LEAD_CAP`).
+- **SPOT n:** shove the far n cars in at the throat. If there's room clear of the foul point, they couple in front of the standing cut (which **does not move**); otherwise the engine **shoves the standing cut deeper** just enough (`spotPlan()` cascades the push, preserving untouched separations). You **can** spot onto a standing/tied cut — refused only when the track is genuinely too full to shove back. Securing: a standing 2+ cut sets `secured`; pulling clears it. Joint cost per §5.
 
 ### Rendering
 - One `draw()` from the model every frame: tracks, ladder, **main‑line extension to OUT (top‑right)**, switches (lined normal/reverse + clearance tick), standing cars (cumulative), engine + coupled cars (along `engRoute` at `engS`), and transient overlays (a kicked cut coasting; the inbound through‑train).
 - Routes: drill route `[A,B,Jᵢ,bodyEnd]`; main route `[OUT,Jᵢ,bodyEnd]`; through route `[OUT,B,OFFLEFT]`. `polyAt` extrapolates `s<0`.
-- Animations via `requestAnimationFrame`; a small step driver (`play([{dur,fn,done}], onAllDone)`). Slow‑mo factor for the “Watch optimal” replay.
+- Animations via `requestAnimationFrame`; a small step driver (`play([{dur,fn}], {onFrame,onDone})`). Slow‑mo factor for the “Watch optimal” replay.
+- **No overlap / no magic sliding (as built):** the loco always trails on the *lead* side of its cut and **stops at the coupling point** — it never drives past it into standing cars. A cut being shoved by a SPOT is **contact‑gated**: the standing cars don't start sliding until the loco's cut actually reaches them. At rest the loco backs off via `restS(cutLen)` so its held cut stays clear of the ladder foot. Labels render on dark pills so nothing on the canvas obscures them.
 
 ### Solver & verification (do this for every puzzle)
-- **Solver = BFS/Dijkstra over states, cost = (moves, then joints).** Returns **par (min moves)** and the optimal line (`opt`). Mirrors the *exact* engine rules (lining always satisfiable so it’s ignored for solvability; respects clearance/foul, lead length, kick legality + load limits, securing, the win rule).
-- **Harness:** replay every puzzle’s `opt` through the live engine across many random rolls (offsets, load assignment) and assert it **wins at exactly par** with no foul/lead/kick‑limit violation. (Prototype ran 40 rolls × N puzzles, 0 failures.)
-- Keep the solver as a throwaway Node script checked into `/tools`, rebuilt from the model when rules change.
+- **Solver = Dijkstra over states, cost = (moves, then joints).** Returns **par (min moves)** and the optimal line (`opt`). It **imports the real `src/model.js`** (Node ESM — model/geometry have no DOM deps) and applies the actual `pull`/`spot`, so there is **zero divergence** between solver and game. Lining is auto‑satisfied per move (ignored for solvability); foul/lead/capacity, securing, and the win rule come for free from the real engine.
+- **Harness:** for each puzzle, assert the declared `par`/`opt` match the solver (optimal), and replay `opt` through a fresh engine to confirm it **wins at exactly par**. Randomized rolls (offsets/marks) come online with the randomization tier (P4/#5).
+- Keep the solver as a Node script in `/tools`, rebuilt from the model when rules change. Run with `node tools/solve.mjs` (repo has `package.json {"type":"module"}` for ESM imports — static site is unaffected).
 
 ### Sound
 Synthesized Web Audio: coupling clunk, kick roll, points click, win chime, refusal buzz, train horn. Lazy `AudioContext` resumed on first gesture; 🔊/🔇 toggle persisted in `localStorage`.
@@ -227,3 +239,59 @@ Tier‑grouped puzzle picker; the **work order inside the top of the yard frame*
 6. **Securing specifics** — the hand‑brake chart (112) as an explicit mechanic later?
 
 > Build it to the curriculum, verify every puzzle with the solver+harness, cite every rule, and keep the official CROR (this repo) as the source of truth.
+
+---
+
+## 11. Decisions locked — 2026‑06‑18 build interview
+
+First ground‑up build = **polished P0–P2 vertical slice** (not the full P0–P7 arc): yard, switch lining (104), PULL/SPOT/KICK, securing (112), move‑first score + joints counter, solver + replay‑harness, ~4–6 verified puzzles. Then extend tier by tier.
+
+- **Yard:** simplified single‑lead 6‑track teaching ladder (AS71–76), labelled honestly as a teaching schematic. Faithful GP yard (AS65–78) = optional later tier.
+- **Identity:** fresh rail‑ops look (charcoal schematic, **yellow diverging target**, signal‑style accents). **Desktop‑first** — this is a professional training tool, not a phone game.
+- **Architecture:** ES modules from day one, no build step (GitHub Pages friendly).
+
+### 11.1 Rule taxonomy — CROR vs Special Instruction (KEY — Jordan's call)
+Every rule the game surfaces is tagged as one of two kinds, **visually distinct**, and the difference is taught from the **very first puzzle**:
+
+- **CROR** — the national rulebook (104, 105, 112, 113.x, 114, 115). Universal, applies everywhere.
+- **SPECIAL INSTRUCTION (S.I.)** — yard‑specific, issued per terminal; **must be learned for YOUR yard.** Examples here: kickable‑track set, kick limits, yard‑speed specifics, the 2‑hand‑brake‑to‑kick rule.
+
+Special instructions are **hammered in** (loud amber badge, called out the first time they appear) but **not overused** — reserved for the genuinely yard‑specific.
+
+**Kickable tracks are a special instruction**, so they are **per‑puzzle configurable**: a puzzle can shuffle the kickable set or have **none at all** (no kicking permitted here). This is deliberate — the player must **read the S.I. each puzzle**, never assume "AS72/73 = kickable" as if it were a rule.
+
+### 11.2 §10 open questions — resolved
+1. **Kick limit (5 empties / 3 loaded):** **deferred to P4** (loaded/empty doesn't exist until then). Confirmed by the CSV — limits are **local special instructions** (some yards "2 loads, empties unrestricted"; others "5, max 3 loads"; outposts "4 regardless"). Apply via the per‑puzzle S.I., never hardcoded.
+2. **Kickable tracks:** **special instruction, per‑puzzle** (§11.1).
+3. **Yard speed:** **not a mechanic** — but **listed / visually represented** in the chrome.
+4. **2‑hand‑brake‑to‑kick:** **cited S.I. note** for the slice; explicit mechanic later.
+
+### 11.3 Speeds to represent (list + animation feel, NOT a control)
+- **Yard / non‑main track: REDUCED, ≤ 15 MPH** — **CROR 105** (verified).
+- **Kicking: ≤ 10 MPH** — ⚠ **verify exact CROR citation** against the Jan 2025 PDF before showing as cited (CSV/forum‑sourced; not yet rulebook‑verified — keep out of player UI until verified).
+- **Coupling impact: ≤ 4 MPH** — ⚠ same caveat (verify before citing).
+- **Never kick uphill** — **CROR 113.5(a)** (track flat/descending so cars don't roll back/foul); reinforced by CN's post‑Melville‑Yard prohibition (TSB).
+- **Some cars can't be kicked at all** (car‑type/equipment restriction) — P4+/car‑types tier; **CROR 113.4** + S.I.
+
+> **Source discipline:** cite the **CROR** for what the game enforces; label **S.I.** clearly; **never** put forum/Reddit text in the player‑facing UI. Verify every speed/figure against the Jan 2025 CROR PDF before it ships as a citation.
+
+---
+
+## 12. The instinct curriculum — what the game is really building (Jordan's call)
+
+Every mechanic exists to drill a **conductor's instinct**. This is the spine; the tiers (§8) and the rules (§5) are how each instinct gets taught and reinforced.
+
+1. **Identify the car by its marking — don't trust the switch list.** The work order / switch list will sometimes be **wrong**; you go by the equipment actually on the ground, not the paper. → *yards are full of look‑alike cars (the difficulty is reading them); the switch list is deliberately wrong sometimes and you must catch it* (mechanic #7).
+2. **Always know the special instructions.** S.I. are yard‑specific and you must learn YOUR yard's — they're visually distinct and per‑puzzle (kickable tracks, kick limits, yard speed). → §11.1.
+3. **Never foul a switch — especially the lead.** Use all the space; don't leave a cut close to a foul point. → foul refusal before the move; shove the cut back to make room; the lead foul can't be shoved (CROR 114).
+4. **Use as few MOVES as possible.** Moves are the score; par is the minimum. → §2.
+5. **Minimize JOINTS, but they're often unavoidable** (especially in setups). Couplings cost time; fewer is cleaner, but you never add a *move* to save a joint. → §2, second counter.
+
+## 13. As‑built rules & constants (2026‑06‑18)
+
+- **Cars only move when pushed/pulled.** Per‑car positions (§9). PULL leaves the rest put; SPOT shoves only the cut it contacts (contact‑gated animation).
+- **Shove‑back (SME rule, Jordan):** you *can* spot onto a standing/tied cut — the engine shoves it deeper to make room. It's poor practice to leave cars near the foul point; **use all the space.** Refused only when the track is too full to shove back.
+- **Foul refused before animating** via `canPull`/`canSpot` in `precheck` (cited reason). Lead foul = `LEAD_CAP` (lead dead‑ends).
+- **Full, varied yards from the 2nd level on:** cuts sitting deep; mix of empty / a pair / a long cut / separated cuts; never stacked at the throat. Authored via the layout DSL (§9).
+- **Constants (px):** `CARLEN 42` (≈50 ft), `ENGLEN 64`, `CLEAR 30` (foul point), `TRACK_HEAD / SPOT_CLEAR 44` (clears the foul point), `LEAD_CAP 12` cars.
+- **Status:** P0 vertical slice playable & verified; 2 puzzles; par/opt hand‑authored and now **solver‑verified** (`tools/solve.mjs`). Sound + Watch‑optimal in. Pending: P1/P2 tiers, randomization (#5), scatter generator (#6), switch‑list‑error mechanic (#7).

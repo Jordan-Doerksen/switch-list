@@ -1,0 +1,10 @@
+{
+  "name": "switch-list",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A free, open CROR yard-switching trainer for conductors. Static site — no build step. package.json is only here so Node can ESM-import src/ for tools/solve.mjs.",
+  "scripts": {
+    "solve": "node tools/solve.mjs"
+  }
+}

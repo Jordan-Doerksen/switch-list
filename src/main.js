@@ -1,0 +1,219 @@
+// main.js — wire the yard up: canvas scaling, switch-lining input, the move
+// builder (PULL/SPOT/count/track), the two counters, rule chips, win + reset.
+// Command-and-watch: you line the road and call the move; the engine works it.
+
+import { W, H, NTRACK, TRACK_IDS, switchPos, engineRoute, CARLEN, ENGLEN, SPOT_CLEAR, restS } from './geometry.js';
+import { freshState, lineSwitch, canPull, canSpot, spotPlan, pull, spot, checkWin, grade } from './model.js';
+import { render } from './render.js';
+import { play, setSpeed } from './anim.js';
+import { sfx, resume, toggleMute, isMuted } from './sound.js';
+import { PUZZLES, RULES } from './puzzles.js';
+
+const canvas = document.getElementById('yard');
+const ctx = canvas.getContext('2d');
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
+
+let puzzle, state, anim = null, busy = false, watching = false;
+
+const $ = (id) => document.getElementById(id);
+
+function load(p) {
+  puzzle = p; state = freshState(p); anim = null; busy = false; watching = false; setSpeed(1);
+  renderRules(); renderWorkOrder(); syncBuilder(); paint(); banner('', '');
+  $('readout').textContent = `Moves 0 / par ${p.par} · Joints 0`;
+}
+
+function paint() { render(ctx, state, puzzle, anim ? { anim } : {}); }
+
+// --- input: line a switch by clicking its target -------------------------
+canvas.addEventListener('click', (e) => {
+  if (busy) return;
+  resume();
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+  let best = -1, bd = 18;
+  for (let i = 0; i < NTRACK; i++) {
+    const s = switchPos(i), d = Math.hypot(s.x - x, s.y - y);
+    if (d < bd) { bd = d; best = i; }
+  }
+  if (best >= 0) { lineSwitch(state, TRACK_IDS[best]); sfx.points(); paint(); }
+});
+
+// --- the move builder ----------------------------------------------------
+$('work').addEventListener('click', () => {
+  resume();
+  const kind = $('act').value, id = $('track').value, n = +$('count').value;
+  doMove(kind, id, n);
+});
+$('optimal').addEventListener('click', () => { resume(); watchOptimal(); });
+$('reset').addEventListener('click', () => { if (!busy) load(puzzle); });
+$('mute').addEventListener('click', () => { $('mute').textContent = toggleMute() ? '🔇' : '🔊'; });
+
+// Full validation up front (lining + count + foul/clearance) so a fouling move is
+// refused before the engine ever moves.
+function precheck(kind, id, n) {
+  return kind === 'pull' ? canPull(state, id, n) : canSpot(state, id, n);
+}
+
+function animateMove(kind, id, n) {
+  return new Promise((resolve) => {
+    const i = TRACK_IDS.indexOf(id);
+    const route = engineRoute(i);
+    const sw = sSwitch(i);
+    const heldLen = state.engine.length * CARLEN;
+    // where the cut's deepest car comes to rest on the track — the loco stops here,
+    // never driving past it into standing cars.
+    let coupleFar, shoveBase = null;
+    if (kind === 'pull') {
+      coupleFar = sw + state.pos[id][0];                       // the throat car's near edge
+    } else {
+      const plan = spotPlan(state, id, n);
+      coupleFar = sw + plan.yourPos[plan.yourPos.length - 1] + CARLEN;
+      if (plan.shove) shoveBase = { id, from: state.pos[id].slice(), to: plan.newStanding, oldThroat: state.pos[id][0] };
+    }
+    const engIn = coupleFar - ENGLEN / 2 - heldLen;
+    const restStart = restS(heldLen);
+    const cutFarStart = restStart + ENGLEN / 2 + heldLen;
+    // the standing cut only starts moving once the loco's cut actually reaches it
+    const contactF = shoveBase && coupleFar !== cutFarStart
+      ? Math.min(0.92, Math.max(0, (sw + shoveBase.oldThroat - cutFarStart) / (coupleFar - cutFarStart)))
+      : 0;
+    const lerp = (a, b, t) => a + (b - a) * t;
+    let cut = state.engine.slice();        // what the loco carries on the way in
+    let committed = false, restEnd = restStart;
+    play([
+      {
+        dur: 600, fn: (t) => {
+          const shove = shoveBase
+            ? { id: shoveBase.id, from: shoveBase.from, to: shoveBase.to, prog: Math.min(1, Math.max(0, (t - contactF) / (1 - contactF))) }
+            : null;
+          anim = { route, engS: lerp(restStart, engIn, t), cut, shove };
+        },
+      },
+      {
+        dur: 600, fn: (t) => {
+          if (!committed) {
+            committed = true;
+            const onto = kind === 'spot' && state.tracks[id].length > 0;
+            (kind === 'pull' ? pull : spot)(state, id, n);
+            if (kind === 'pull' || onto) sfx.couple(); else sfx.roll();
+            cut = state.engine.slice();    // what it carries on the way out
+            restEnd = restS(state.engine.length * CARLEN);
+          }
+          anim = { route, engS: lerp(engIn, restEnd, t), cut, shove: null };
+        },
+      },
+    ], { onFrame: paint, onDone: () => { anim = null; resolve(); } });
+  });
+}
+
+function doMove(kind, id, n) {
+  if (busy) return;
+  const chk = precheck(kind, id, n);
+  if (!chk.ok) { sfx.refuse(); banner(chk.msg, 'bad'); return; }
+  busy = true;
+  animateMove(kind, id, n).then(() => { busy = false; afterMove(); });
+}
+
+// Auto-line the ladder for the route to `id`: its switch reverse, all others normal.
+function autoLine(id) { for (const t of TRACK_IDS) state.lined[t] = (t === id) ? 'reverse' : 'normal'; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ▶ Watch optimal — reset, then auto-line + play the fewest-moves line in slow-mo.
+async function watchOptimal() {
+  if (busy || !puzzle.opt) return;
+  load(puzzle);
+  busy = true; watching = true; setSpeed(1.7);
+  banner(`▶ Watching the optimal line — par ${puzzle.par} move${puzzle.par === 1 ? '' : 's'}`, 'ok');
+  for (const [act, trk, n] of puzzle.opt) {
+    autoLine(trk); sfx.points(); paint(); await sleep(520);
+    await animateMove(act, trk, n);
+    $('readout').textContent = `Moves ${state.moves} / par ${puzzle.par} · Joints ${state.joints}`;
+    await sleep(320);
+  }
+  setSpeed(1); busy = false; watching = false;
+  afterMove();
+}
+
+function afterMove() {
+  $('readout').textContent = `Moves ${state.moves} / par ${puzzle.par} · Joints ${state.joints}`;
+  banner(state.msg, 'ok');
+  syncBuilder(); paint();
+  if (checkWin(state, puzzle)) {
+    const g = grade(state, puzzle);
+    sfx.win();
+    const clean = state.joints <= bestJoints() ? ` — ${g.bonus}, clean` : ` · ${g.bonus}`;
+    banner(`${g.beatPar ? '✓ ' : ''}${g.head}${clean}`, g.beatPar ? 'win' : 'ok');
+  }
+}
+
+// rough "clean" benchmark until the solver owns it
+function bestJoints() { return Math.max(1, Math.ceil(puzzle.par / 2)); }
+
+function syncBuilder() {
+  // keep the count cap sensible for the chosen action
+  const kind = $('act').value, id = $('track').value;
+  const max = kind === 'pull' ? (state.tracks[id]?.length || 1) : Math.max(1, state.engine.length);
+  const cnt = $('count'); const cur = +cnt.value;
+  cnt.innerHTML = '';
+  for (let k = 1; k <= Math.max(1, max); k++) {
+    const o = document.createElement('option'); o.value = k; o.textContent = k; cnt.appendChild(o);
+  }
+  cnt.value = Math.min(cur || 1, Math.max(1, max));
+}
+['act', 'track'].forEach((id) => $(id).addEventListener('change', syncBuilder));
+
+function renderRules() {
+  const box = $('rules'); box.innerHTML = '';
+  for (const key of puzzle.rules) {
+    const r = RULES[key]; if (!r) continue;
+    const chip = document.createElement('div');
+    chip.className = `chip ${r.kind}`;
+    chip.innerHTML = `<b>${r.cite}</b><span>${r.label}</span>`;
+    box.appendChild(chip);
+  }
+}
+
+// The job, stated like a switch list — derived from the puzzle goal.
+function renderWorkOrder() {
+  const g = puzzle.goal;
+  const src = {};
+  for (const [trk, cars] of Object.entries(puzzle.start || {})) for (const c of cars) src[c] = trk;
+  const from = [...new Set(g.cars.map((c) => src[c]).filter(Boolean))];
+  const nums = g.cars.map((c) => c.split(' ').pop());
+  const verb = g.depart ? 'Build & depart' : 'Build';
+  $('workorder').innerHTML =
+    `<div class="wo-top"><span class="wo-tag">WORK ORDER</span> <span class="wo-id">${puzzle.id.toUpperCase()}</span> · ${puzzle.title}</div>`
+    + `<div class="wo-job">${verb} <b>${g.track}</b> — gather <b>${nums.join(' · ')}</b> onto it`
+    + `${from.length ? ` <span class="wo-from">(now on ${from.join(', ')})</span>` : ''}.</div>`
+    + `<div class="wo-meta">Target <b>${puzzle.par} move${puzzle.par === 1 ? '' : 's'}</b> (par) — fewest moves wins.`
+    + `<span class="wo-tip">${puzzle.hint}</span></div>`;
+}
+
+function banner(text, tone) {
+  const el = $('msg');
+  el.textContent = text || '';
+  el.className = `banner ${tone || ''}`;
+}
+
+// arclength from the lead bumper to track i's switch, along its engine route
+function sSwitch(i) {
+  const r = engineRoute(i);
+  return Math.hypot(r[1].x - r[0].x, r[1].y - r[0].y) + Math.hypot(r[2].x - r[1].x, r[2].y - r[1].y);
+}
+
+// --- track dropdown (kept in sync with geometry) -------------------------
+const trackSel = $('track');
+TRACK_IDS.forEach((id) => { const o = document.createElement('option'); o.value = id; o.textContent = id; trackSel.appendChild(o); });
+
+// --- puzzle picker -------------------------------------------------------
+const picker = $('picker');
+PUZZLES.forEach((p, k) => {
+  const o = document.createElement('option'); o.value = k; o.textContent = `${k + 1}. ${p.title}`;
+  picker.appendChild(o);
+});
+picker.addEventListener('change', () => load(PUZZLES[+picker.value]));
+
+$('mute').textContent = isMuted() ? '🔇' : '🔊';
+load(PUZZLES[0]);
