@@ -104,7 +104,8 @@ Three moves, each one “move” for scoring:
 - **Switches / lining — Rule 104 (Hand Operated Switches).**
   - 104(b): after a switch is turned, **examine the points and check the target** to confirm it’s lined for the route in use.
   - 104(c): **must not turn a switch while any car/engine is between the points and the fouling point** (except a running switch or the Rule 114 exception). → the clearance mechanic.
-  - 104(h): a main‑track switch’s **normal position is the main route; main‑track switches must be left lined and locked normal**, except the 104(i) cases (occupied by equipment, attended, by GBO/clearance/special instruction). → restore switches to normal (good practice in the yard; required on the main).
+  - 104(h)/(i): a **main‑track** switch’s normal position is the main route; main‑track switches must be left lined and locked normal — **but the rule reads "Except when switching,"** and this yard is **non‑main**. So **restore‑to‑normal is NOT enforced** here. (Verified against the Jan 2025 CROR 2026‑06‑18: the proposed **"104(o)" non‑main restore rule does not exist** — a restore‑or‑fail mechanic was assessed and **dropped**, not cited.)
+  - **Switch‑target shape (verified 2026‑06‑18).** Hand‑operated switch targets **must not be diamond‑shaped** (104): non‑main = green normal / **yellow reverse**; main = green / red. **Diamond** targets are reserved for **semi‑automatic / spring switches (104.4)** — only adopt that shape if those mechanics are added later. Current render = non‑diamond green/yellow → already correct.
 - **Securing — Rule 112 (Securing unattended equipment).** Hand‑brake chart + effectiveness test. In this game: any standing cut of **2+ cars is tied down** (hand brake on); a tied 2+ cut is what a kick can roll onto.
 - **Coupling — Rule 113.0 / 113.2.** Couple, then **stretch to verify the joint** before relying on it.
 - **Kicking — Rule 113.4 / 113.5.**
@@ -155,13 +156,13 @@ Suggested ramp (each stage = a tier; cite the rule when it’s introduced):
 0. **The yard & the move** — *every car identical (treat all as loaded; no empty distinction), no kicking, no clearance refusals beyond the obvious.* Learn: line a switch (104), PULL, SPOT, read the ladder, and **fewest moves**. One engine, one cut, set a car out.
 1. **Digging & order** — buried cars, build a specific set on a track; the lead only holds so much (clearance, 114) so you stage it. Still no kicking.
 2. **Securing & kicking** — 2+ cuts tie down (112); introduce KICK onto a tied cut (113.4/113.5); kicking saves a coupling but **never costs a move**.
-3. **Don’t foul the points** — the clearance point becomes strict (114 / 104(c)); over‑stuffing a track is refused; restore switches to normal (104(h)).
+3. **Don’t foul the points** — the clearance point becomes strict (114 / 104(c)); over‑stuffing a track is refused. *(A "restore switches to normal" trap was assessed and dropped — not a CROR rule for non‑main switching; see §Rules 104.)*
 4. **Loads & empties** — introduce the loaded/empty distinction (solid vs hollow); **keep them separate / block them**; **kick limits 5 empties / 3 loaded** (113.5 s.i.); **no kicking loaded into empty** (SME rule). 
 5. **Car types & length** — autoracks/lumber are longer; the lead holds fewer; clearance is length‑aware.
 6. **Road jobs** — inbound sets out, you build the outbound and depart (§7).
 7. **Outbound manifest** — build the outbound in **exact blocking order** (loads block, then empties; or station order), not just the right set.
 
-Always present in the chrome (cite, don’t quiz): **yard speed 15 MPH / Reduced (105)**, **clearance points (114)**, **switches lined & restored normal (104)**.
+Always present in the chrome (cite, don’t quiz): **yard speed — REDUCED (105)**, **clearance points (114)**, **switches lined for the route (104)**.
 
 ---
 

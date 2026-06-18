@@ -115,7 +115,16 @@ function animateMove(kind, id, n) {
     const lerp = (a, b, t) => a + (b - a) * t;
     let cut = state.engine.slice();        // what the loco carries on the way in
     let committed = false, restEnd = restStart;
-    play([
+    const commitOnce = () => {
+      if (committed) return;
+      committed = true;
+      const onto = kind === 'spot' && state.tracks[id].length > 0;
+      (kind === 'pull' ? pull : kind === 'kick' ? kick : spot)(state, id, n);
+      if (kind === 'kick') sfx.roll(); else if (kind === 'pull' || onto) sfx.couple(); else sfx.roll();
+      cut = state.engine.slice();          // what it carries on the way out
+      restEnd = restS(state.engine.reduce((a, c) => a + carLen(state.type[c]), 0));
+    };
+    const phases = [
       {
         dur: 600, fn: (t) => {
           const shove = shoveBase
@@ -124,20 +133,25 @@ function animateMove(kind, id, n) {
           anim = { route, engS: lerp(restStart, engIn, t), cut, shove };
         },
       },
-      {
-        dur: 600, fn: (t) => {
-          if (!committed) {
-            committed = true;
-            const onto = kind === 'spot' && state.tracks[id].length > 0;
-            (kind === 'pull' ? pull : kind === 'kick' ? kick : spot)(state, id, n);
-            if (kind === 'kick') sfx.roll(); else if (kind === 'pull' || onto) sfx.couple(); else sfx.roll();
-            cut = state.engine.slice();    // what it carries on the way out
-            restEnd = restS(state.engine.reduce((a, c) => a + carLen(state.type[c]), 0));
-          }
-          anim = { route, engS: lerp(engIn, restEnd, t), cut, shove: null };
+    ];
+    // CROR 113.2 — after coupling, the engineer STRETCHES the joint to confirm the knuckles
+    // are locked before pulling. PULL only (you've just coupled on). A subtle tug toward the
+    // lead to take up the slack, then settle — flavour, not a gate; the move is already committed.
+    if (kind === 'pull') {
+      phases.push({
+        dur: 280, fn: (t) => {
+          commitOnce();                                  // cars are now on the loco
+          anim = { route, engS: engIn - 6 * Math.sin(t * Math.PI), cut, shove: null };
         },
+      });
+    }
+    phases.push({
+      dur: 600, fn: (t) => {
+        commitOnce();
+        anim = { route, engS: lerp(engIn, restEnd, t), cut, shove: null };
       },
-    ], { onFrame: paint, onDone: () => { anim = null; resolve(); } });
+    });
+    play(phases, { onFrame: paint, onDone: () => { anim = null; resolve(); } });
   });
 }
 

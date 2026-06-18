@@ -8,12 +8,12 @@
 
 export const RULES = {
   line:   { kind: 'cror', cite: 'CROR 104',          label: 'Line & examine the switch for your route' },
-  speed:  { kind: 'cror', cite: 'CROR 105',          label: 'Yard speed — REDUCED, ≤ 15 MPH' },
+  speed:  { kind: 'cror', cite: 'CROR 105',          label: 'Yard speed — REDUCED (stop within ½ range of vision); transfers ≤ 15 MPH' },
   couple: { kind: 'cror', cite: 'CROR 113.0 / 113.2', label: 'Couple, then stretch to verify the joint' },
   shove:  { kind: 'cror', cite: 'CROR 115',          label: 'Shove only with the route lined & protected' },
   verify: { kind: 'si',   cite: 'Switch list',        label: 'Verify cars by their markings — the list can be wrong' },
-  secure: { kind: 'cror', cite: 'CROR 112',           label: 'A standing cut of 2+ cars is tied down (secured)' },
-  kick:   { kind: 'cror', cite: 'CROR 113.4 / 113.5', label: 'Kick only onto a secured cut; not every car can be kicked' },
+  secure: { kind: 'cror', cite: 'CROR 112',           label: 'Unattended equipment gets a hand brake (secured)' },
+  kick:   { kind: 'cror', cite: 'CROR 113.4 / 113.5', label: 'Kick only onto a secured 2+ car backstop; tanks/autoracks aren’t kicked' },
   kickable: { kind: 'si', cite: 'Kickable tracks',    label: 'Kick only where the special instruction allows (⚡)' },
   loads:  { kind: 'si',   cite: 'Loads & empties',     label: 'Solid = loaded, hollow = empty. Don’t kick a load into empties; kick ≤5 (≤3 loaded)' },
   order:  { kind: 'si',   cite: 'Manifest / blocking', label: 'Build the outbound in order, then DEPART out the lead' },
