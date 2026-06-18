@@ -4,7 +4,7 @@
 
 import {
   W, H, LEAD_Y, LEAD_LEFT, FOOT, NTRACK, TRACK_IDS, switchPos, trackY,
-  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, LEAD_ROUTE, THROUGH_ROUTE, restS, polyAt, TYPES, carLen,
+  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, SPOT_CLEAR, LEAD_ROUTE, THROUGH_ROUTE, restS, polyAt, TYPES, carLen,
 } from './geometry.js';
 
 const C = {
@@ -34,11 +34,14 @@ export function render(ctx, state, puzzle, opts = {}) {
   // ride on the inbound train, so hide them from their track until delivered.
   const cine = opts.cine || null;
   const shove = opts.anim ? opts.anim.shove : null;
-  const hide = cine && !cine.delivered ? new Set(cine.setoutCars) : null;
+  // arrive: set-out cars ride the inbound. setout: they slide onto the track (drawSetout).
+  // depart on: they're normal standing cars. So hide them from the track until `depart`.
+  const hide = cine && cine.phase !== 'depart' ? new Set(cine.setoutCars) : null;
   for (let i = 0; i < NTRACK; i++) drawStandingCars(ctx, state, i, shove, hide);
 
   if (cine) {
-    drawInboundTrain(ctx, state, cine);                       // road train working; player power is off-scene
+    if (cine.phase === 'setout') drawSetout(ctx, state, cine);   // the cars being shoved into the track
+    drawInboundTrain(ctx, state, cine);                          // road train; your power is off-scene
   } else {
     // the engine + its cut: animated train if a move is playing, else at rest
     const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
@@ -54,10 +57,24 @@ function drawInboundTrain(ctx, state, cine) {
   carRect(ctx, loco.x, loco.y, loco.angle, ENGLEN, null, 'loco');
   const cars = [];
   for (let k = 0; k < 6; k++) cars.push({ len: 42, type: k % 2 ? 'hopper' : 'box' });
-  if (!cine.delivered) for (const m of cine.setoutCars) cars.push({ len: carLen(state.type[m]), type: state.type[m], loaded: state.loaded[m], mark: m });
+  if (cine.phase === 'arrive') for (const m of cine.setoutCars) cars.push({ len: carLen(state.type[m]), type: state.type[m], loaded: state.loaded[m], mark: m });
   for (let k = 0; k < 5; k++) cars.push({ len: 42, type: k % 2 ? 'box' : 'hopper' });
   let s = cine.introS - ENGLEN / 2;
   for (const c of cars) { const p = polyAt(THROUGH_ROUTE, s - c.len / 2); carRect(ctx, p.x, p.y, p.angle, c.len, c.mark || null, 'car', c.type, c.loaded); s -= c.len; }
+}
+
+// The set-out cars sliding into their track from the throat — the inbound spotting
+// them in (cine.spotProg 0→1), instead of teleporting onto the track.
+function drawSetout(ctx, state, cine) {
+  const i = TRACK_IDS.indexOf(cine.to), sx = switchPos(i).x, y = trackY(i);
+  const cars = state.tracks[cine.to], P = state.pos[cine.to];
+  const idx = []; for (let k = 0; k < cars.length; k++) if (cine.setoutCars.includes(cars[k])) idx.push(k);
+  if (!idx.length) return;
+  const shift = (P[idx[0]] - SPOT_CLEAR) * (1 - cine.spotProg);   // start bunched at the throat, slide deep
+  for (const k of idx) {
+    const ne = P[k] - shift, w = carLen(state.type[cars[k]]);
+    carRect(ctx, sx + ne + w / 2, y, 0, w, cars[k], 'car', state.type[cars[k]], state.loaded[cars[k]]);
+  }
 }
 
 function drawRoutes(ctx) {

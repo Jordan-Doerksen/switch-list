@@ -47,14 +47,14 @@ function arrivalCinematic() {
   cancelCine();
   if (!puzzle.inbound) { paint(); return; }
   const lenR = routeLength(THROUGH_ROUTE), stopS = lenR - 110;
-  cine = { introS: -220, setoutCars: puzzle.inbound.cars, to: puzzle.inbound.to, delivered: false };
+  cine = { introS: -220, setoutCars: puzzle.inbound.cars, to: puzzle.inbound.to, phase: 'arrive', spotProg: 0 };
   const finish = () => { cancelCine(); paint(); };
   cineCancel = play([
-    { dur: 2200, fn: (t) => { if (cine) cine.introS = -220 + (stopS + 220) * t; } },              // arrive & stop
-    { dur: 700, fn: () => { if (cine) cine.delivered = true; } },                                 // set out (cars drop to the track)
-    { dur: 1700, fn: (t) => { if (cine) cine.introS = stopS + (lenR + 420 - stopS) * t; } },      // depart out the lead
+    { dur: 2200, fn: (t) => { if (cine) { cine.phase = 'arrive'; cine.introS = -220 + (stopS + 220) * t; } } },   // arrive & stop
+    { dur: 1100, fn: (t) => { if (cine) { cine.phase = 'setout'; cine.spotProg = t; } } },                        // spot the cars in
+    { dur: 1700, fn: (t) => { if (cine) { cine.phase = 'depart'; cine.introS = stopS + (lenR + 420 - stopS) * t; } } }, // depart out the lead
   ], { onFrame: paint, onDone: finish });
-  cineTimer = setTimeout(finish, 5500);
+  cineTimer = setTimeout(finish, 5800);
 }
 
 // --- input: line a switch by clicking its target -------------------------
