@@ -92,7 +92,22 @@ function precheck(kind, id, n) {
   return kind === 'pull' ? canPull(state, id, n) : kind === 'kick' ? canKick(state, id, n) : canSpot(state, id, n);
 }
 
+// Set out / grab on the drill — a short shuffle on the lead (no ladder trip). Commit the
+// model move, then a brief engine nudge so it reads as deliberate.
+function animateLead(kind, n) {
+  return new Promise((resolve) => {
+    (kind === 'pull' ? pull : spot)(state, 'LEAD', n);
+    if (kind === 'pull') sfx.couple(); else sfx.roll();
+    const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
+    const s0 = restS(cutLen), cut = state.engine.slice();
+    const cancel = play([{ dur: 420, fn: (t) => { anim = { route: LEAD_ROUTE, engS: s0 - 24 * Math.sin(t * Math.PI), cut }; } }],
+      { onFrame: paint, onDone: () => { stopAnim = null; anim = null; resolve(); } });
+    stopAnim = () => { cancel(); resolve(); };
+  });
+}
+
 function animateMove(kind, id, n) {
+  if (id === 'LEAD') return animateLead(kind, n);
   return new Promise((resolve) => {
     const i = TRACK_IDS.indexOf(id);
     const route = engineRoute(i);
@@ -246,7 +261,9 @@ function bestJoints() { return Math.max(1, Math.ceil(puzzle.par / 2)); }
 function syncBuilder() {
   // keep the count cap sensible for the chosen action
   const kind = $('act').value, id = $('track').value;
-  const max = kind === 'pull' ? (state.tracks[id]?.length || 1) : Math.max(1, state.engine.length);
+  const max = kind === 'pull'
+    ? (id === 'LEAD' ? (state.lead?.length || 1) : (state.tracks[id]?.length || 1))
+    : Math.max(1, state.engine.length);
   const cnt = $('count'); const cur = +cnt.value;
   cnt.innerHTML = '';
   for (let k = 1; k <= Math.max(1, max); k++) {
@@ -358,6 +375,7 @@ function sSwitch(i) {
 // --- track dropdown (kept in sync with geometry) -------------------------
 const trackSel = $('track');
 TRACK_IDS.forEach((id) => { const o = document.createElement('option'); o.value = id; o.textContent = id; trackSel.appendChild(o); });
+{ const o = document.createElement('option'); o.value = 'LEAD'; o.textContent = 'LEAD (drill)'; trackSel.appendChild(o); }   // SPOT = set out, PULL = grab
 
 // --- puzzle picker -------------------------------------------------------
 const picker = $('picker');
