@@ -23,6 +23,15 @@ export function switchPos(i) {
 export function trackY(i) { return switchPos(i).y; }
 export const TRACK_RIGHT = 1292;         // deep end of every body track
 
+// --- Travel distance (the move-score tiebreaker) --------------------------
+// One-way arclength from the engine's lead rest to a coupling point at track i,
+// `off` px in from the switch: lead run to the foot + up the ladder + into the track.
+// Far tracks and deep cuts cost more; the central drill costs almost nothing — which is
+// what makes leaving a cut on the lead worth it.
+export const LADDER_STEP = Math.hypot(STEP_X, STEP_Y);   // foot→switch, per track
+export const LEAD_RUN = FOOT.x - 120;                    // lead rest (x≈120) → foot
+export function reach(i, off) { return LEAD_RUN + (i + 1) * LADDER_STEP + Math.max(0, off); }
+
 // --- Main line: the ladder continues past AS76 up off the top-right.
 const beyond = switchPos(NTRACK - 1);
 export const MAIN_OUT = { x: beyond.x + STEP_X * 3, y: beyond.y - STEP_Y * 3 };

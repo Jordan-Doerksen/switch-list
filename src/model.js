@@ -6,7 +6,9 @@
 // lays out and works correctly, a car only moves when pushed, and tracks can hold
 // separated cuts.
 
-import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType } from './geometry.js';
+import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType, reach } from './geometry.js';
+
+const LEAD_MOVE_DIST = 80;               // a set-out/grab on the drill is a short shuffle — cheap travel
 
 export const lenOf = (state, label) => carLen(state.type[label]);
 export const loadedOf = (state, label) => state.loaded[label] !== false;   // default loaded
@@ -55,7 +57,7 @@ export function freshState(puzzle) {
   // engine IN (it shoved the cut in and hasn't pulled out yet); the next move pays that
   // pull-out as a +1 "reposition". So a finishing spot never charges its pull-out — that's
   // why a 3-handling job (pull, pull, spot) is 5 engine-moves, not 6.
-  return { tracks, pos, type, loaded, engine: [], lead: [], secured, lined, kickable, kickLimit, out: true, moves: 0, joints: 0, msg: '', won: false };
+  return { tracks, pos, type, loaded, engine: [], lead: [], secured, lined, kickable, kickLimit, out: true, moves: 0, joints: 0, dist: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -141,8 +143,10 @@ export function pull(state, id, n) {
   if (id === 'LEAD') {                                  // grab parked cars back onto the engine — it's right here
     state.engine.push(...state.lead.splice(0, n));
     state.joints += 1;                                 // couple back on
+    state.dist += LEAD_MOVE_DIST;
     return commit(state, `Grabbed ${n} off the lead.`, 1);
   }
+  state.dist += 2 * reach(TRACK_IDS.indexOf(id), state.pos[id][0]);   // back in to the throat car + pull out
   const taken = state.tracks[id].splice(0, n);
   state.pos[id].splice(0, n);                          // remaining cars stay put
   state.engine.push(...taken);
@@ -158,10 +162,12 @@ export function spot(state, id, n) {
   if (id === 'LEAD') {                                  // set the rear of the cut out on the drill (scratch)
     const taken = state.engine.splice(state.engine.length - n, n);
     state.lead = taken.concat(state.lead);
+    state.dist += LEAD_MOVE_DIST;
     return commit(state, `Set out ${n} on the lead.`, 1);   // engine's already here — no reposition, no coupling
   }
   const onto = state.tracks[id].length > 0;
   const plan = spotPlan(state, id, n);
+  state.dist += 2 * reach(TRACK_IDS.indexOf(id), plan.deepEdge);      // shove in to the cut + pull out
   const taken = state.engine.splice(state.engine.length - n, n);
   state.tracks[id] = taken.concat(state.tracks[id]);
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
@@ -204,6 +210,7 @@ export function kick(state, id, n) {
   const v = canKick(state, id, n);
   if (!v.ok) return refuse(state, v.msg);
   const plan = spotPlan(state, id, n, true);
+  state.dist += reach(TRACK_IDS.indexOf(id), plan.deepEdge);          // one shove in — the cut rolls, engine doesn't pull out
   const taken = state.engine.splice(state.engine.length - n, n);
   state.tracks[id] = taken.concat(state.tracks[id]);
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
