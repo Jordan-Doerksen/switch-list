@@ -6,7 +6,7 @@
 // lays out and works correctly, a car only moves when pushed, and tracks can hold
 // separated cuts.
 
-import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType, reach } from './geometry.js';
+import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, LADDER_STEP, switchPos, carLen, kickableType, reach } from './geometry.js';
 
 const LEAD_MOVE_DIST = 80;               // a set-out/grab on the drill is a short shuffle — cheap travel
 
@@ -65,7 +65,20 @@ export function lineSwitch(state, id) {
   state.lined[id] = state.lined[id] === 'reverse' ? 'normal' : 'reverse';
 }
 
+// A cut set out on the drill sits UP-LINE (top of the lead, at AS76 extending down) and
+// blocks the switches it covers: every body track from the top down within the cut's length
+// is unreachable until it's pulled off. Tracks below the cut stay open (engine works underneath).
+const leadCutLen = (state) => (state.lead || []).reduce((a, c) => a + carLen(state.type[c]), 0);
+export function leadBlocked(state, id) {
+  const L = leadCutLen(state);
+  if (!L) return false;
+  const i = TRACK_IDS.indexOf(id);
+  return (NTRACK - 1 - i) * LADDER_STEP < L;       // switch i sits under the parked cut
+}
+
 export function routeReady(state, id) {
+  if (leadBlocked(state, id))
+    return { ok: false, msg: `${id} is blocked — a cut is set out on the drill above its switch. Pull it off the lead first.` };
   const i = TRACK_IDS.indexOf(id);
   if (state.lined[id] !== 'reverse')
     return { ok: false, msg: `${id} is lined normal — line its switch reverse for the track (CROR 104).` };

@@ -106,7 +106,7 @@ export const PUZZLES = [
   {
     id: 'p1-sort', tier: 1,
     title: 'Build it in order',
-    hint: 'AS72 holds five cars in the WRONG order for your manifest. Shuttling them up one at a time is five long trips to AS72 — instead, pull the cut down close and SET it OUT on the lead (the drill), then feed it into AS74 in order. Build CN 305001 … 305005, front to back.',
+    hint: 'AS72 holds five cars in the WRONG order for your manifest. Build AS74 in order — CN 305001 … 305005 (front to back) — which means handling them one at a time. The other tracks are full of cars that aren’t yours.',
     rules: ['order', 'line', 'speed', 'couple', 'shove'],
     start: {
       AS72: [220, 'CN 305005', 'CN 305004', 'CN 305003', 'CN 305002', 'CN 305001'],
@@ -116,8 +116,8 @@ export const PUZZLES = [
       AS76: [200, ['UTLX 7712', 'tank'], ['UTLX 7740', 'tank']],
     },
     goal: { track: 'AS74', cars: ['CN 305001', 'CN 305002', 'CN 305003', 'CN 305004', 'CN 305005'], ordered: true },
-    par: 16,
-    opt: [['pull', 'AS72', 2], ['spot', 'LEAD', 2], ['pull', 'AS72', 2], ['pull', 'LEAD', 1], ['spot', 'AS74', 2], ['pull', 'LEAD', 1], ['spot', 'LEAD', 2], ['pull', 'AS72', 1], ['pull', 'AS74', 1], ['pull', 'LEAD', 2], ['spot', 'AS74', 4]],
+    par: 19,
+    opt: [['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1], ['pull', 'AS72', 1], ['spot', 'AS74', 1]],
   },
   {
     id: 'p1-clear', tier: 1,

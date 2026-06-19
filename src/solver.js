@@ -65,13 +65,8 @@ export function solve(puzzle, { maxMoves = 28, maxStates = 150000 } = {}) {
     // KICK onto the goal (non-depart only; same moves as a spot but 0 joints, so the
     // solver picks it for the cleaner line). DEPART builds on the engine — no kick.
     if (!depart) for (let n = 1; n <= cur.s.engine.length; n++) step(cur, 'kick', goalTrack, n, h, best);
-    // STAGE on the drill — park the WHOLE cut close (only when nothing's parked yet), then
-    // feed it back a piece at a time. The move+distance cost makes the solver pick this only
-    // when it beats re-tripping a far track (e.g. a reverse-order sort). Win needs a clear lead.
-    if (cur.s.engine.length && !(cur.s.lead && cur.s.lead.length))
-      step(cur, 'spot', 'LEAD', cur.s.engine.length, h, best);
-    if (cur.s.lead && cur.s.lead.length)
-      for (let n = 1; n <= cur.s.lead.length; n++) step(cur, 'pull', 'LEAD', n, h, best);
+    // NOTE: the solver does NOT use the lead/drill. Lead-staging is a player tool, trained on
+    // hand-crafted puzzles with authored solutions (Jordan's call) — never solver-driven.
   }
   return null;
 }

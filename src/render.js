@@ -4,7 +4,7 @@
 
 import {
   W, H, LEAD_Y, LEAD_LEFT, FOOT, NTRACK, TRACK_IDS, switchPos, trackY,
-  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, SPOT_CLEAR, LEAD_ROUTE, THROUGH_ROUTE, restS, polyAt, TYPES, carLen,
+  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, SPOT_CLEAR, LEAD_ROUTE, THROUGH_ROUTE, LADDER_STEP, restS, polyAt, TYPES, carLen,
 } from './geometry.js';
 
 const C = {
@@ -192,15 +192,17 @@ function drawStandingCars(ctx, state, i, shove, hide) {
   }
 }
 
-// Cars set out on the drill (staging) — parked on the lead toward the bumper, clear of the
-// engine's working area. Drawn left-to-right from the throat-most parked car.
+// Cars set out on the drill (staging) — parked UP-LINE on the lead/through-line, at the top
+// (AS76) extending down toward the foot. Sitting across those switches blocks them; the engine
+// works the tracks below. (Right of the engine, never back toward the lamp.)
 function drawLeadCut(ctx, state) {
   if (!state.lead || !state.lead.length) return;
-  let x = 56;                                                   // right edge of the parked cut
+  let s = 3 * LADDER_STEP;                                      // MAIN_OUT → AS76 along the through-line
   for (const label of state.lead) {
     const w = carLen(state.type[label]);
-    carRect(ctx, x - w / 2, LEAD_Y, 0, w, label, 'car', state.type[label], state.loaded[label]);
-    x -= w;
+    const p = polyAt(THROUGH_ROUTE, s + w / 2);
+    carRect(ctx, p.x, p.y, p.angle, w, label, 'car', state.type[label], state.loaded[label]);
+    s += w;
   }
 }
 
