@@ -57,7 +57,7 @@ export function freshState(puzzle) {
   // engine IN (it shoved the cut in and hasn't pulled out yet); the next move pays that
   // pull-out as a +1 "reposition". So a finishing spot never charges its pull-out — that's
   // why a 3-handling job (pull, pull, spot) is 5 engine-moves, not 6.
-  return { tracks, pos, type, loaded, engine: [], lead: [], secured, lined, kickable, kickLimit, out: true, moves: 0, joints: 0, dist: 0, msg: '', won: false };
+  return { tracks, pos, type, loaded, engine: [], lead: [], secured, lined, kickable, kickLimit, goalTrack: puzzle.goal && puzzle.goal.track, out: true, moves: 0, joints: 0, dist: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -95,7 +95,10 @@ export function spotPlan(state, id, n, couple = false) {
     deepEdge = trackLen;                             // empty — shove to the very end
   } else {
     const p0 = P[0];                                 // throat-most standing car's near edge
-    deepEdge = (couple || p0 - GAP - yourTotal < CLEAR) ? p0 : p0 - GAP;
+    // Couple TIGHT onto your own build (the goal track) or a kick backstop — your train is
+    // one solid cut. Only a separate, not-yours standing cut gets a car-length gap.
+    const mine = couple || id === state.goalTrack;
+    deepEdge = (mine || p0 - GAP - yourTotal < CLEAR) ? p0 : p0 - GAP;
   }
   const nearEdge = deepEdge - yourTotal;
   return { yourPos: placeYour(nearEdge), newStanding: P.slice(), shove: false, deepEdge: Math.max(deepEdge, standingDeepEdge), nearEdge };
