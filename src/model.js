@@ -6,9 +6,7 @@
 // lays out and works correctly, a car only moves when pushed, and tracks can hold
 // separated cuts.
 
-import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, LADDER_STEP, switchPos, carLen, kickableType, reach } from './geometry.js';
-
-const LEAD_MOVE_DIST = 80;               // a set-out/grab on the drill is a short shuffle — cheap travel
+import { TRACK_IDS, NTRACK, CARLEN, CLEAR, SPOT_CLEAR, LEAD_CLEAR, TRACK_RIGHT, switchPos, carLen, kickableType } from './geometry.js';
 
 export const lenOf = (state, label) => carLen(state.type[label]);
 export const loadedOf = (state, label) => state.loaded[label] !== false;   // default loaded
@@ -57,7 +55,7 @@ export function freshState(puzzle) {
   // engine IN (it shoved the cut in and hasn't pulled out yet); the next move pays that
   // pull-out as a +1 "reposition". So a finishing spot never charges its pull-out — that's
   // why a 3-handling job (pull, pull, spot) is 5 engine-moves, not 6.
-  return { tracks, pos, type, loaded, engine: [], lead: [], secured, lined, kickable, kickLimit, goalTrack: puzzle.goal && puzzle.goal.track, out: true, moves: 0, joints: 0, dist: 0, msg: '', won: false };
+  return { tracks, pos, type, loaded, engine: [], secured, lined, kickable, kickLimit, goalTrack: puzzle.goal && puzzle.goal.track, out: true, moves: 0, joints: 0, msg: '', won: false };
 }
 
 // --- Switch lining / route check (CROR 104) -------------------------------
@@ -65,20 +63,7 @@ export function lineSwitch(state, id) {
   state.lined[id] = state.lined[id] === 'reverse' ? 'normal' : 'reverse';
 }
 
-// A cut set out on the drill sits UP-LINE (top of the lead, at AS76 extending down) and
-// blocks the switches it covers: every body track from the top down within the cut's length
-// is unreachable until it's pulled off. Tracks below the cut stay open (engine works underneath).
-const leadCutLen = (state) => (state.lead || []).reduce((a, c) => a + carLen(state.type[c]), 0);
-export function leadBlocked(state, id) {
-  const L = leadCutLen(state);
-  if (!L) return false;
-  const i = TRACK_IDS.indexOf(id);
-  return (NTRACK - 1 - i) * LADDER_STEP < L;       // switch i sits under the parked cut
-}
-
 export function routeReady(state, id) {
-  if (leadBlocked(state, id))
-    return { ok: false, msg: `${id} is blocked — a cut is set out on the drill above its switch. Pull it off the lead first.` };
   const i = TRACK_IDS.indexOf(id);
   if (state.lined[id] !== 'reverse')
     return { ok: false, msg: `${id} is lined normal — line its switch reverse for the track (CROR 104).` };
@@ -119,11 +104,6 @@ export function spotPlan(state, id, n, couple = false) {
 
 // --- Validators (no mutation) ---------------------------------------------
 export function canPull(state, id, n) {
-  if (id === 'LEAD') {                                  // grab a cut parked on the drill — no switch to line
-    if (n < 1) return { ok: false, msg: 'Grab at least one car.' };
-    if (n > state.lead.length) return { ok: false, msg: `Only ${state.lead.length} car${state.lead.length === 1 ? '' : 's'} parked on the lead.` };
-    return { ok: true, msg: '' };
-  }
   const r = routeReady(state, id);
   if (!r.ok) return r;
   const have = state.tracks[id].length;
@@ -136,11 +116,6 @@ export function canPull(state, id, n) {
 }
 
 export function canSpot(state, id, n) {
-  if (id === 'LEAD') {                                  // set a cut out on the drill — no switch to line
-    if (n < 1) return { ok: false, msg: 'Set out at least one car.' };
-    if (n > state.engine.length) return { ok: false, msg: `You're only holding ${state.engine.length} car${state.engine.length === 1 ? '' : 's'}.` };
-    return { ok: true, msg: '' };
-  }
   const r = routeReady(state, id);
   if (!r.ok) return r;
   const have = state.engine.length;
@@ -156,13 +131,6 @@ export function canSpot(state, id, n) {
 export function pull(state, id, n) {
   const v = canPull(state, id, n);
   if (!v.ok) return refuse(state, v.msg);
-  if (id === 'LEAD') {                                  // grab parked cars back onto the engine — it's right here
-    state.engine.push(...state.lead.splice(0, n));
-    state.joints += 1;                                 // couple back on
-    state.dist += LEAD_MOVE_DIST;
-    return commit(state, `Grabbed ${n} off the lead.`, 1);
-  }
-  state.dist += 2 * reach(TRACK_IDS.indexOf(id), state.pos[id][0]);   // back in to the throat car + pull out
   const taken = state.tracks[id].splice(0, n);
   state.pos[id].splice(0, n);                          // remaining cars stay put
   state.engine.push(...taken);
@@ -175,15 +143,8 @@ export function pull(state, id, n) {
 export function spot(state, id, n) {
   const v = canSpot(state, id, n);
   if (!v.ok) return refuse(state, v.msg);
-  if (id === 'LEAD') {                                  // set the rear of the cut out on the drill (scratch)
-    const taken = state.engine.splice(state.engine.length - n, n);
-    state.lead = taken.concat(state.lead);
-    state.dist += LEAD_MOVE_DIST;
-    return commit(state, `Set out ${n} on the lead.`, 1);   // engine's already here — no reposition, no coupling
-  }
   const onto = state.tracks[id].length > 0;
   const plan = spotPlan(state, id, n);
-  state.dist += 2 * reach(TRACK_IDS.indexOf(id), plan.deepEdge);      // shove in to the cut + pull out
   const taken = state.engine.splice(state.engine.length - n, n);
   state.tracks[id] = taken.concat(state.tracks[id]);
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
@@ -226,7 +187,6 @@ export function kick(state, id, n) {
   const v = canKick(state, id, n);
   if (!v.ok) return refuse(state, v.msg);
   const plan = spotPlan(state, id, n, true);
-  state.dist += reach(TRACK_IDS.indexOf(id), plan.deepEdge);          // one shove in — the cut rolls, engine doesn't pull out
   const taken = state.engine.splice(state.engine.length - n, n);
   state.tracks[id] = taken.concat(state.tracks[id]);
   state.pos[id] = plan.yourPos.concat(plan.newStanding);
@@ -254,7 +214,6 @@ const sameOrder = (a, b) => a.length === b.length && a.every((c, k) => c === b[k
 //  • otherwise — the consist is built on the goal track and the loco is empty.
 // goal.ordered ⇒ exact order (manifest / blocking); else set. The Depart call is UI.
 export function checkWin(state, puzzle) {
-  if (state.lead && state.lead.length) return false;     // the drill must be left clear — no cars parked on the lead
   const g = puzzle.goal;
   if (g.depart) return g.ordered ? sameOrder(state.engine, g.cars) : sameSet(state.engine, g.cars);
   if (state.engine.length > 0) return false;

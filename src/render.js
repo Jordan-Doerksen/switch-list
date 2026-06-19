@@ -4,7 +4,7 @@
 
 import {
   W, H, LEAD_Y, LEAD_LEFT, FOOT, NTRACK, TRACK_IDS, switchPos, trackY,
-  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, SPOT_CLEAR, LEAD_ROUTE, THROUGH_ROUTE, LADDER_STEP, restS, polyAt, TYPES, carLen,
+  TRACK_RIGHT, MAIN_OUT, ENGLEN, CLEAR, SPOT_CLEAR, LEAD_ROUTE, THROUGH_ROUTE, restS, polyAt, TYPES, carLen,
 } from './geometry.js';
 
 const C = {
@@ -38,7 +38,6 @@ export function render(ctx, state, puzzle, opts = {}) {
   // depart on: they're normal standing cars. So hide them from the track until `depart`.
   const hide = cine && cine.phase !== 'depart' ? new Set(cine.setoutCars) : null;
   for (let i = 0; i < NTRACK; i++) drawStandingCars(ctx, state, i, shove, hide);
-  drawLeadCut(ctx, state);                                       // cars parked on the drill (staging)
 
   if (cine) {
     if (cine.phase === 'setout') drawSetout(ctx, state, cine);   // the cars being shoved into the track
@@ -189,20 +188,6 @@ function drawStandingCars(ctx, state, i, shove, hide) {
     const nearEdge = shoving ? shove.from[k] + (shove.to[k] - shove.from[k]) * shove.prog : P[k];
     const w = carLen(state.type[cars[k]]);
     carRect(ctx, sx + nearEdge + w / 2, y, 0, w, cars[k], 'car', state.type[cars[k]], state.loaded[cars[k]]);
-  }
-}
-
-// Cars set out on the drill (staging) — parked UP-LINE on the lead/through-line, at the top
-// (AS76) extending down toward the foot. Sitting across those switches blocks them; the engine
-// works the tracks below. (Right of the engine, never back toward the lamp.)
-function drawLeadCut(ctx, state) {
-  if (!state.lead || !state.lead.length) return;
-  let s = 3 * LADDER_STEP;                                      // MAIN_OUT → AS76 along the through-line
-  for (const label of state.lead) {
-    const w = carLen(state.type[label]);
-    const p = polyAt(THROUGH_ROUTE, s + w / 2);
-    carRect(ctx, p.x, p.y, p.angle, w, label, 'car', state.type[label], state.loaded[label]);
-    s += w;
   }
 }
 

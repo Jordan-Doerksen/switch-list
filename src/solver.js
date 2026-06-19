@@ -9,20 +9,18 @@ import { TRACK_IDS } from './geometry.js';
 function clone(s) {
   const tracks = {}, pos = {}, secured = {}, lined = {};
   for (const t of TRACK_IDS) { tracks[t] = s.tracks[t].slice(); pos[t] = s.pos[t].slice(); secured[t] = s.secured[t]; lined[t] = s.lined[t]; }
-  return { tracks, pos, type: s.type, loaded: s.loaded, kickable: s.kickable, kickLimit: s.kickLimit, goalTrack: s.goalTrack, engine: s.engine.slice(), lead: (s.lead || []).slice(), secured, lined, out: s.out, moves: s.moves, joints: s.joints, dist: s.dist, msg: '', won: s.won };
+  return { tracks, pos, type: s.type, loaded: s.loaded, kickable: s.kickable, kickLimit: s.kickLimit, goalTrack: s.goalTrack, engine: s.engine.slice(), secured, lined, out: s.out, moves: s.moves, joints: s.joints, msg: '', won: s.won };
 }
 function autoLine(s, id) { for (const t of TRACK_IDS) s.lined[t] = (t === id) ? 'reverse' : 'normal'; }
-// `out` and the lead cut are part of the state — two otherwise-equal positions cost
-// differently next move (a spotted-in engine must pull clear), and cars parked on the
-// drill change what's reachable/winnable, so neither may be merged away.
-function key(s) { return TRACK_IDS.map((t) => s.tracks[t].join(',') + '@' + s.pos[t].join(',')).join(';') + '#' + s.engine.join(',') + (s.out ? '>' : '<') + '|' + (s.lead || []).join(','); }
+// `out` is part of the state — two otherwise-equal positions cost differently next move
+// (a spotted-in engine must pull clear), so they may not be merged away.
+function key(s) { return TRACK_IDS.map((t) => s.tracks[t].join(',') + '@' + s.pos[t].join(',')).join(';') + '#' + s.engine.join(',') + (s.out ? '>' : '<'); }
 
-// binary min-heap on (moves, then DISTANCE, then joints) — moves-first scoring with travel
-// as the tiebreaker, so the solver prefers the shortest-running line among fewest-move lines.
+// binary min-heap on (moves, then joints) — move-first scoring; joints (couplings) break ties.
 class Heap {
   constructor() { this.a = []; }
   get size() { return this.a.length; }
-  _lt(x, y) { const a = x.s, b = y.s; if (a.moves !== b.moves) return a.moves < b.moves; if (a.dist !== b.dist) return a.dist < b.dist; return a.joints < b.joints; }
+  _lt(x, y) { const a = x.s, b = y.s; if (a.moves !== b.moves) return a.moves < b.moves; return a.joints < b.joints; }
   push(x) { const a = this.a; a.push(x); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (this._lt(a[i], a[p])) { [a[i], a[p]] = [a[p], a[i]]; i = p; } else break; } }
   pop() { const a = this.a, top = a[0], last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && this._lt(a[l], a[m])) m = l; if (r < a.length && this._lt(a[r], a[m])) m = r; if (m === i) break; [a[i], a[m]] = [a[m], a[i]]; i = m; } } return top; }
 }
@@ -42,12 +40,12 @@ export function solve(puzzle, { maxMoves = 28, maxStates = 150000 } = {}) {
   const depart = !!puzzle.goal.depart;          // DEPART: the consist rides on the engine, not a track
   const start = freshState(puzzle);
   const h = new Heap(); h.push({ s: start, path: [] });
-  const best = new Map([[key(start), [0, 0, 0]]]);
+  const best = new Map([[key(start), [0, 0]]]);
   let explored = 0;
   while (h.size) {
     const cur = h.pop();
     if (++explored > maxStates) return null;
-    if (checkWin(cur.s, puzzle)) return { par: cur.s.moves, joints: cur.s.joints, dist: cur.s.dist, opt: cur.path, explored };
+    if (checkWin(cur.s, puzzle)) return { par: cur.s.moves, joints: cur.s.joints, opt: cur.path, explored };
     if (cur.s.moves >= maxMoves) continue;
 
     for (const T of TRACK_IDS) {
@@ -74,8 +72,8 @@ const MOVE_FN = { pull, spot, kick };
 function step(cur, act, T, n, h, best) {
   const s = clone(cur.s); autoLine(s, T);
   if (!MOVE_FN[act](s, T, n).ok) return;
-  const k = key(s), c = [s.moves, s.dist, s.joints], b = best.get(k);
-  const better = !b || c[0] < b[0] || (c[0] === b[0] && (c[1] < b[1] || (c[1] === b[1] && c[2] < b[2])));
+  const k = key(s), c = [s.moves, s.joints], b = best.get(k);
+  const better = !b || c[0] < b[0] || (c[0] === b[0] && c[1] < b[1]);
   if (better) { best.set(k, c); h.push({ s, path: cur.path.concat([[act, T, n]]) }); }
 }
 
