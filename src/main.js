@@ -15,6 +15,7 @@ const dpr = Math.min(2, window.devicePixelRatio || 1);
 canvas.width = W * dpr; canvas.height = H * dpr; ctx.scale(dpr, dpr);
 
 let puzzle, state, anim = null, busy = false, watching = false;
+let gen = 0, stopAnim = null;       // gen invalidates in-flight loops on (re)load; stopAnim aborts the live tween
 let ordered = true;                 // is the switch list verified? (true when there's no list to check)
 const flagged = new Set();          // indices the player has flagged as wrong
 let cine = null, cineCancel = null, cineTimer = null;   // inbound-arrival cinematic state
@@ -28,6 +29,9 @@ function cancelCine() {
 }
 
 function load(p) {
+  gen++;                              // invalidate any in-flight move / watch-optimal loop
+  if (stopAnim) stopAnim();          // abort the live tween (mid-move, depart, etc.)
+  stopAnim = null;
   cancelCine();
   puzzle = p; state = freshState(p); anim = null; busy = false; watching = false; setSpeed(1);
   ordered = !p.listed; flagged.clear();
@@ -151,7 +155,8 @@ function animateMove(kind, id, n) {
         anim = { route, engS: lerp(engIn, restEnd, t), cut, shove: null };
       },
     });
-    play(phases, { onFrame: paint, onDone: () => { anim = null; resolve(); } });
+    const cancel = play(phases, { onFrame: paint, onDone: () => { stopAnim = null; anim = null; resolve(); } });
+    stopAnim = () => { cancel(); resolve(); };          // load() can abort this move mid-flight
   });
 }
 
@@ -161,7 +166,8 @@ function doMove(kind, id, n) {
   const chk = precheck(kind, id, n);
   if (!chk.ok) { sfx.refuse(); banner(chk.msg, 'bad'); return; }
   busy = true;
-  animateMove(kind, id, n).then(() => { busy = false; afterMove(); });
+  const g = gen;
+  animateMove(kind, id, n).then(() => { if (gen !== g) return; busy = false; afterMove(); });
 }
 
 // Auto-line the ladder for the route to `id`: its switch reverse, all others normal.
@@ -172,6 +178,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function watchOptimal() {
   if (busy || cine || !puzzle.opt) return;
   load(puzzle);
+  const myGen = gen;                 // if the puzzle is switched mid-demo, bail out cleanly
   cancelCine();                      // skip the arrival cinematic for the demo
   if (!ordered) {                                   // auto-certify the list for the demo
     puzzle.listed.forEach((e, i) => { if (e.error) flagged.add(i); });
@@ -180,11 +187,15 @@ async function watchOptimal() {
   busy = true; watching = true; setSpeed(1.7);
   banner(`▶ Watching the optimal line — par ${puzzle.par} move${puzzle.par === 1 ? '' : 's'}`, 'ok');
   for (const [act, trk, n] of puzzle.opt) {
+    if (gen !== myGen) return;
     autoLine(trk); sfx.points(); paint(); await sleep(520);
+    if (gen !== myGen) return;
     await animateMove(act, trk, n);
+    if (gen !== myGen) return;
     $('readout').textContent = `Moves ${state.moves} / par ${puzzle.par} · Joints ${state.joints}`;
     await sleep(320);
   }
+  if (gen !== myGen) return;
   setSpeed(1); busy = false; watching = false;
   afterMove();
   if (puzzle.goal.depart && checkWin(state, puzzle)) departOut();   // finish the demo by departing
@@ -225,8 +236,8 @@ function departOut() {
   const cutLen = state.engine.reduce((a, c) => a + carLen(state.type[c]), 0);
   const startS = restS(cutLen), endS = -(cutLen + ENGLEN + 220);
   const cut = state.engine.slice();
-  play([{ dur: 1300, fn: (t) => { anim = { route: LEAD_ROUTE, engS: startS + (endS - startS) * t, cut }; } }],
-    { onFrame: paint, onDone: () => { anim = null; busy = false; paint(); } });
+  stopAnim = play([{ dur: 1300, fn: (t) => { anim = { route: LEAD_ROUTE, engS: startS + (endS - startS) * t, cut }; } }],
+    { onFrame: paint, onDone: () => { stopAnim = null; anim = null; busy = false; paint(); } });
 }
 
 // rough "clean" benchmark until the solver owns it
